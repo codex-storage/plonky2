@@ -1095,7 +1095,12 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
         {
             self.connect(hash_part, Target::wire(pi_gate, wire))
         }
-        self.randomize_unused_pi_wires(pi_gate);
+
+        // See <https://github.com/0xPolygonZero/plonky2/issues/456>
+        // however randomization makes debugging harder as runs are not deterministic
+        if self.config.randomize_unused_wires {
+            self.randomize_unused_pi_wires(pi_gate);
+        }
 
         // Place LUT-related gates.
         self.add_all_lookups();

@@ -661,6 +661,7 @@ pub trait Read {
         let max_quotient_degree_factor = self.read_usize()?;
         let use_base_arithmetic_gate = self.read_bool()?;
         let zero_knowledge = self.read_bool()?;
+        let randomize_unused_wires = self.read_bool()?;
         let fri_config = self.read_fri_config()?;
 
         Ok(CircuitConfig {
@@ -672,6 +673,7 @@ pub trait Read {
             max_quotient_degree_factor,
             use_base_arithmetic_gate,
             zero_knowledge,
+            randomize_unused_wires,
             fri_config,
         })
     }
@@ -1696,6 +1698,7 @@ pub trait Write {
             max_quotient_degree_factor,
             use_base_arithmetic_gate,
             zero_knowledge,
+            randomize_unused_wires,
             fri_config,
         } = config;
 
@@ -1707,6 +1710,7 @@ pub trait Write {
         self.write_usize(*max_quotient_degree_factor)?;
         self.write_bool(*use_base_arithmetic_gate)?;
         self.write_bool(*zero_knowledge)?;
+        self.write_bool(*randomize_unused_wires)?;
         self.write_fri_config(fri_config)?;
 
         Ok(())

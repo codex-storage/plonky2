@@ -80,6 +80,9 @@ pub struct CircuitConfig {
     /// A boolean to activate the zero-knowledge property. When this is set to `false`, proofs *may*
     /// leak additional information.
     pub zero_knowledge: bool,
+    /// See <https://github.com/0xPolygonZero/plonky2/issues/456>
+    /// Can be turned off for deterministic results
+    pub randomize_unused_wires: bool,
     /// A cap on the quotient polynomial's degree factor. The actual degree factor is derived
     /// systematically, but will never exceed this value.
     pub max_quotient_degree_factor: usize,
@@ -107,6 +110,7 @@ impl CircuitConfig {
             security_bits: 100,
             num_challenges: 2,
             zero_knowledge: false,
+            randomize_unused_wires: false,
             max_quotient_degree_factor: 8,
             fri_config: FriConfig {
                 rate_bits: 3,
