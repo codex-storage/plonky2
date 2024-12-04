@@ -56,6 +56,11 @@ pub trait Gate<F: RichField + Extendable<D>, const D: usize>: 'static + Send + S
     /// This is used as differentiating tag in gate serializers.
     fn id(&self) -> String;
 
+    /// Another, more friendly identifier for easier interop with third-party tooling
+    fn short_id(&self) -> String {
+        self.id()
+    }
+
     /// Serializes this custom gate to the targeted byte buffer, with the provided [`CommonCircuitData`].
     fn serialize(&self, dst: &mut Vec<u8>, common_data: &CommonCircuitData<F, D>) -> IoResult<()>;
 

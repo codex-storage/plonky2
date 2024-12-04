@@ -82,6 +82,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for Exponentiation
         format!("{self:?}<D={D}>")
     }
 
+    fn short_id(&self) -> String {
+        format!("ExponentiationGate:{}",self.num_power_bits)
+    }
+
     fn serialize(&self, dst: &mut Vec<u8>, _common_data: &CommonCircuitData<F, D>) -> IoResult<()> {
         dst.write_usize(self.num_power_bits)
     }

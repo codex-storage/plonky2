@@ -20,6 +20,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for NoopGate {
         "NoopGate".into()
     }
 
+    fn short_id(&self) -> String {
+        "NoopGate".into()
+    }
+
     fn serialize(
         &self,
         _dst: &mut Vec<u8>,

@@ -33,6 +33,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for PublicInputGat
         "PublicInputGate".into()
     }
 
+    fn short_id(&self) -> String {
+        "PublicInputGate".into()
+    }
+
     fn serialize(
         &self,
         _dst: &mut Vec<u8>,

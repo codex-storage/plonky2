@@ -125,6 +125,10 @@ impl<F: RichField + Extendable<D> + Poseidon, const D: usize> Gate<F, D> for Pos
         format!("{self:?}<WIDTH={SPONGE_WIDTH}>")
     }
 
+    fn short_id(&self) -> String {
+        format!("PoseidonMdsGate:{}",SPONGE_WIDTH)
+    }
+
     fn serialize(
         &self,
         _dst: &mut Vec<u8>,

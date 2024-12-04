@@ -58,6 +58,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for MulExtensionGa
         format!("{self:?}")
     }
 
+    fn short_id(&self) -> String {
+        format!("MulExtensionGenerator:{}",self.num_ops)
+    }
+
     fn serialize(&self, dst: &mut Vec<u8>, _common_data: &CommonCircuitData<F, D>) -> IoResult<()> {
         dst.write_usize(self.num_ops)
     }

@@ -67,6 +67,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for ReducingGate<D
         format!("{self:?}")
     }
 
+    fn short_id(&self) -> String {
+        format!("ReducingGate:{}",self.num_coeffs)
+    }
+
     fn serialize(&self, dst: &mut Vec<u8>, _common_data: &CommonCircuitData<F, D>) -> IoResult<()> {
         dst.write_usize(self.num_coeffs)?;
         Ok(())

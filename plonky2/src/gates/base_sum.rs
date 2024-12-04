@@ -56,6 +56,10 @@ impl<F: RichField + Extendable<D>, const D: usize, const B: usize> Gate<F, D> fo
         format!("{self:?} + Base: {B}")
     }
 
+    fn short_id(&self) -> String {
+        format!("BaseSumGate:{}",self.num_limbs)
+    }
+
     fn serialize(&self, dst: &mut Vec<u8>, _common_data: &CommonCircuitData<F, D>) -> IoResult<()> {
         dst.write_usize(self.num_limbs)
     }

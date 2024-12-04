@@ -127,6 +127,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for RandomAccessGa
         format!("{self:?}<D={D}>")
     }
 
+    fn short_id(&self) -> String {
+        format!("RandomAccessGate:{}",self.bits)
+    }
+
     fn serialize(&self, dst: &mut Vec<u8>, _common_data: &CommonCircuitData<F, D>) -> IoResult<()> {
         dst.write_usize(self.bits)?;
         dst.write_usize(self.num_copies)?;

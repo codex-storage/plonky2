@@ -91,6 +91,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for LookupTableGat
         )
     }
 
+    fn short_id(&self) -> String {
+        format!("LookupTableGate:{}",self.num_slots)
+    }
+
     fn serialize(&self, dst: &mut Vec<u8>, common_data: &CommonCircuitData<F, D>) -> IoResult<()> {
         dst.write_usize(self.num_slots)?;
         dst.write_usize(self.last_lut_row)?;

@@ -178,6 +178,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for CosetInterpola
         format!("{self:?}<D={D}>")
     }
 
+    fn short_id(&self) -> String {
+        format!("CosetInterpolationGate:{}",self.subgroup_bits)
+    }
+
     fn serialize(&self, dst: &mut Vec<u8>, _common_data: &CommonCircuitData<F, D>) -> IoResult<()> {
         dst.write_usize(self.subgroup_bits)?;
         dst.write_usize(self.degree)?;
