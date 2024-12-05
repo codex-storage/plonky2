@@ -1,0 +1,76 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+  <title>witness visualizer</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  
+  <link rel="stylesheet" href="styles.css">
+  <script language="javascript" src="witness_view.js"></script>
+  <script language="javascript">
+    window.onload = function() {
+      console.log("onload!");
+      load_witness("fibonacci_witness.json");
+    }
+  </script>  
+</head>
+
+<body>
+
+  <h2>Plonky2 witness visualizer</h2>
+
+  <div>
+    file name: <input id="fname" type="text" placeholder="witness.json" disabled=true/>
+  </div>
+
+  <br/>
+
+  <div id="top-container">
+    <div id="left">
+      <table id="gates">
+        <tr>
+          <th>index</th>
+          <th width="200px">gate type</th>
+        </tr>
+      </table>
+    </div>
+    <div id="middle">
+      &nbsp;&nbsp;
+    </div>
+    <div id="right">
+      <table id="cell-properties">
+        <tr><th>property</th><th width="200px">value (hover!)</th></tr>
+        <tr><td>row     </td><td id="cell-row"   ></td></tr>
+        <tr><td>column  </td><td id="cell-column"></td></tr>
+        <tr><td>value   </td><td id="cell-value" ></td></tr>
+        <tr><td>gate    </td><td id="cell-gate"  ></td></tr>
+        </tr>
+      </table>
+    </div>  
+  </div>
+
+  <br/>
+  
+  <svg id="matrix" width="1350" height="1000" xmlns="http://www.w3.org/2000/svg">
+  </svg>
+
+<!--  
+  <svg width="320" height="130" xmlns="http://www.w3.org/2000/svg">
+   <rect width="50" height="50" x="20" y="20" style="fill:rgb(128,128,255);stroke-width:1;stroke:black" />
+   <rect width="50" height="50" x="70" y="20" style="fill:rgb(128,255,128);stroke-width:1;stroke:black" />
+   <rect width="50" height="50" x="20" y="70" style="fill:rgb(255,128,128);stroke-width:1;stroke:black" />
+   <rect width="50" height="50" x="70" y="70" style="fill:rgb(255,255,128);stroke-width:1;stroke:black" />
+ </svg> 
+-->
+
+  <br/>
+
+  <div>
+    ratio of non-empty cells: <input id="nonempty-ratio" type="text" placeholder="100" disabled=true/>
+  </div> 
+
+</body>
+</html>
