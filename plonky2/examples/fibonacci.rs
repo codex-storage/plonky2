@@ -4,6 +4,7 @@ use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+use plonky2::plonk::prover::ProverOptions;
 
 /// An example of using Plonky2 to prove a statement of the form
 /// "I know the 100th element of the Fibonacci sequence, starting with constants a and b."
@@ -38,7 +39,12 @@ fn main() -> Result<()> {
     pw.set_target(initial_b, F::ONE)?;
 
     let data = builder.build::<C>();
-    let proof = data.prove(pw)?;
+
+    let prover_opts = ProverOptions {
+        export_witness: Some(String::from("witness.json")),
+    };
+  
+    let proof = data.prove_with_options(pw, &prover_opts)?;
 
     println!(
         "100th Fibonacci number mod |F| (starting with {}, {}) is: {}",

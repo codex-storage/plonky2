@@ -4,6 +4,8 @@ pub mod generator_serialization;
 #[macro_use]
 pub mod gate_serialization;
 
+pub mod json;
+
 #[cfg(not(feature = "std"))]
 use alloc::{collections::BTreeMap, sync::Arc, vec, vec::Vec};
 use core::convert::Infallible;

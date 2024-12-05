@@ -9,6 +9,9 @@ use anyhow::{ensure, Result};
 use hashbrown::HashMap;
 use plonky2_maybe_rayon::*;
 
+use serde::Serialize;
+use crate::util::serialization::json::write_json_file;
+
 use super::circuit_builder::{LookupChallenges, LookupWire};
 use crate::field::extension::Extendable;
 use crate::field::polynomial::{PolynomialCoeffs, PolynomialValues};
@@ -17,7 +20,7 @@ use crate::field::zero_poly_coset::ZeroPolyOnCoset;
 use crate::fri::oracle::PolynomialBatch;
 use crate::gates::lookup::LookupGate;
 use crate::gates::lookup_table::LookupTableGate;
-use crate::gates::selectors::LookupSelectors;
+use crate::gates::selectors::{LookupSelectors};
 use crate::hash::hash_types::RichField;
 use crate::iop::challenger::Challenger;
 use crate::iop::generator::generate_partial_witness;
@@ -111,11 +114,47 @@ pub fn set_lookup_wires<
     Ok(())
 }
 
+//------------------------------------------------------------------------------
+
+// debugging features in the prover
+#[derive(Debug,Clone)]
+pub struct ProverOptions {
+    pub export_witness: Option<String>,      // export the full witness into the given file
+}
+
+pub const default_prover_options: ProverOptions = ProverOptions {
+    export_witness: None,  
+};
+
+// things we want to export to be used by third party tooling
+#[derive(Debug,Clone,Serialize)]
+struct ThingsToExport<F> {
+    gates:           Vec<String>,
+    selector_vector: Vec<usize>,
+    matrix:          Vec<Vec<F>>,
+}
+
+// the idea is to export the witness (plus some more information),
+// so that third-party tools can for example visualize it
+fn collect_things_to_export<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    common_data:   &CommonCircuitData<F, D>,
+    wires_matrix:  &MatrixWitness<F>,
+) -> ThingsToExport<F> {
+    ThingsToExport {
+        gates:           common_data.gates.iter().map(|g| g.0.short_id()).collect(),
+        selector_vector: common_data.selectors_info.selector_vector.clone(),
+        matrix:          wires_matrix.wire_values.clone(),
+    }
+}
+
+//------------------------------------------------------------------------------
+
 pub fn prove<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
     prover_data: &ProverOnlyCircuitData<F, C, D>,
     common_data: &CommonCircuitData<F, D>,
     inputs: PartialWitness<F>,
     timing: &mut TimingTree,
+    prover_options: &ProverOptions,
 ) -> Result<ProofWithPublicInputs<F, C, D>>
 where
     C::Hasher: Hasher<F>,
@@ -127,7 +166,7 @@ where
         generate_partial_witness(inputs, prover_data, common_data)?
     );
 
-    prove_with_partition_witness(prover_data, common_data, partition_witness, timing)
+    prove_with_partition_witness(prover_data, common_data, partition_witness, timing, prover_options)
 }
 
 pub fn prove_with_partition_witness<
@@ -139,6 +178,7 @@ pub fn prove_with_partition_witness<
     common_data: &CommonCircuitData<F, D>,
     mut partition_witness: PartitionWitness<F>,
     timing: &mut TimingTree,
+    prover_options: &ProverOptions,
 ) -> Result<ProofWithPublicInputs<F, C, D>>
 where
     C::Hasher: Hasher<F>,
@@ -183,6 +223,16 @@ where
             prover_data.fft_root_table.as_ref(),
         )
     );
+
+    // export witness etc for third party tooling
+    match &prover_options.export_witness {
+        None        => (),
+        Some(fname) => {
+            let things_to_export = collect_things_to_export::<F, C, D>( &common_data, &witness );
+            write_json_file(&fname, &things_to_export);
+            println!("exported witness to `{}`",fname);
+        },
+    }
 
     let mut challenger = Challenger::<F, C::Hasher>::new();
 
