@@ -232,6 +232,7 @@ where
                 selectors_info: SelectorsInfo {
                     selector_indices: vec![],
                     groups: vec![],
+                    selector_vector:  vec![],
                 },
                 quotient_degree_factor: 0,
                 num_gate_constraints: 0,

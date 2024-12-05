@@ -15,8 +15,9 @@ pub(crate) const UNUSED_SELECTOR: usize = u32::MAX as usize;
 
 #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
 pub struct SelectorsInfo {
-    pub(crate) selector_indices: Vec<usize>,
-    pub(crate) groups: Vec<Range<usize>>,
+    pub(crate) selector_indices: Vec<usize>,            // which gate is in which selector group
+    pub(crate) groups:           Vec<Range<usize>>,     // how are the gates allocated to selector columns
+    pub(crate) selector_vector:  Vec<usize>,            // the gate index for each row (used for third party tooling)
 }
 
 impl SelectorsInfo {
@@ -135,7 +136,8 @@ pub(crate) fn selector_polynomials<F: RichField + Extendable<D>, const D: usize>
             )],
             SelectorsInfo {
                 selector_indices: vec![0; num_gates],
-                groups: vec![0..num_gates],
+                groups:           vec![0..num_gates],
+                selector_vector:  vec![0; n],
             },
         );
     }
@@ -181,11 +183,21 @@ pub(crate) fn selector_polynomials<F: RichField + Extendable<D>, const D: usize>
         }
     }
 
+    // for third party tools, we compute a single selector vector too (union of all selectors)
+    let mut selector_vector: Vec<usize> = vec![usize::MAX; n];
+    for (j, g) in instances.iter().enumerate() {
+        let GateInstance { gate_ref, .. } = g;
+        let i = index(gate_ref.0.id());
+        let gr = group(i);
+        selector_vector[j] = i;
+    }
+
     (
         polynomials,
         SelectorsInfo {
             selector_indices,
             groups,
+            selector_vector,
         },
     )
 }

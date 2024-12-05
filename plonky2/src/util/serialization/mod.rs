@@ -713,10 +713,12 @@ pub trait Read {
             let end = self.read_usize()?;
             groups.push(Range { start, end });
         }
+        let selector_vector = self.read_usize_vec()?;
 
         Ok(SelectorsInfo {
             selector_indices,
             groups,
+            selector_vector,
         })
     }
 
@@ -1734,6 +1736,7 @@ pub trait Write {
         let SelectorsInfo {
             selector_indices,
             groups,
+            selector_vector,
         } = selectors_info;
 
         self.write_usize_vec(selector_indices.as_slice())?;
@@ -1742,6 +1745,7 @@ pub trait Write {
             self.write_usize(group.start)?;
             self.write_usize(group.end)?;
         }
+        self.write_usize_vec(selector_vector.as_slice())?;
         Ok(())
     }
 
