@@ -13,7 +13,8 @@
   <script language="javascript">
     window.onload = function() {
       console.log("onload!");
-      load_witness("fibonacci_witness.json");
+      let fname = "fibonacci_witness.json";
+      load_witness(fname);
     }
   </script>  
 </head>
@@ -29,7 +30,21 @@
   <br/>
 
   <div id="top-container">
-    <div id="left">
+
+    <div class="horiz">
+      <table id="cell-properties">
+        <tr><th>parameter</th><th width="50px">value</th></tr>
+        <tr><td>number of columns       </td><td id="num-cols"      >0</td></tr>
+        <tr><td>number of rows          </td><td id="num-rows"      >0</td></tr>
+        <tr><td>ratio of non-empty cells</td><td id="nonempty-ratio">0</td></tr>
+      </table>
+    </div>
+
+    <div class="horiz">
+      &nbsp;&nbsp;
+    </div>
+
+    <div class="horiz">
       <table id="gates">
         <tr>
           <th>index</th>
@@ -37,25 +52,29 @@
         </tr>
       </table>
     </div>
-    <div id="middle">
+
+    <div class="horiz">
       &nbsp;&nbsp;
     </div>
-    <div id="right">
+
+    <div class="horiz">
       <table id="cell-properties">
         <tr><th>property</th><th width="200px">value (hover!)</th></tr>
         <tr><td>row     </td><td id="cell-row"   ></td></tr>
         <tr><td>column  </td><td id="cell-column"></td></tr>
         <tr><td>value   </td><td id="cell-value" ></td></tr>
         <tr><td>gate    </td><td id="cell-gate"  ></td></tr>
-        </tr>
       </table>
     </div>  
+
   </div>
 
   <br/>
   
-  <svg id="matrix" width="1350" height="1000" xmlns="http://www.w3.org/2000/svg">
-  </svg>
+  <div id="" style="overflow:scroll; width:1400px; height:600px;">
+    <svg id="matrix" width="1350" height="1000" xmlns="http://www.w3.org/2000/svg">
+    </svg>
+  <div>
 
 <!--  
   <svg width="320" height="130" xmlns="http://www.w3.org/2000/svg">
@@ -66,11 +85,6 @@
  </svg> 
 -->
 
-  <br/>
-
-  <div>
-    ratio of non-empty cells: <input id="nonempty-ratio" type="text" placeholder="100" disabled=true/>
-  </div> 
 
 </body>
 </html>

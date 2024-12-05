@@ -99,6 +99,11 @@ function initialize_from_witness(fname,json) {
   ncolumns  = matrix.length
   ncells    = ncolumns * nrows;
 
+  let el_num_rows = document.getElementById("num-rows");
+  let el_num_cols = document.getElementById("num-cols");
+  el_num_rows.innerHTML = nrows.toString();
+  el_num_cols.innerHTML = ncolumns.toString();
+
   let gates_base   = [];
   let gate_colors  = [];
 
@@ -148,9 +153,9 @@ function initialize_from_witness(fname,json) {
     }
   }
 
-  el_ratio = document.getElementById("nonempty-ratio");
+  let el_ratio = document.getElementById("nonempty-ratio");
   let ratio = Math.round( 100 * (ncells - empty_counter) / ncells);
-  el_ratio.value = ratio.toString() + "%";
+  el_ratio.innerHTML = ratio.toString() + "%";
 }
 
 function handle_error(res) {

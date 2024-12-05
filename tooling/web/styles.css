@@ -10,7 +10,7 @@ th, td {
   padding: 5px;
 }
 
-#left, #middle, #right {
+.horiz {
   display: inline-block; 
   *display: inline; 
   vertical-align: top;
