@@ -41,7 +41,7 @@ fn main() -> Result<()> {
     let data = builder.build::<C>();
 
     let prover_opts = ProverOptions {
-        export_witness: Some(String::from("witness.json")),
+        export_witness: Some(String::from("fibonacci_witness.json")),
     };
   
     let proof = data.prove_with_options(pw, &prover_opts)?;
