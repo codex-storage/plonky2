@@ -1,0 +1,3 @@
+*.json
+!fibonacci_witness.json
+!lookup_witness.json

@@ -39,6 +39,26 @@ const the_gate_colors =
   , "#c060c0"     // ReducingExtensionGate       -> medium purple
   ];
 
+const the_gate_equations = 
+  [ "???"                  // UnknownGate   
+  , "w = c0*x*y + c1*z"    // ArithmeticGate
+  , "w = c0*x*y + c1*z"    // ArithmeticExtensionGate 
+  , "y = sum_i 2^i*b_i"    // BaseSumGate    
+  , "x=c0, y=c1"           // ConstantGate                
+  , "..."                  // CosetInterpolationGate      
+  , "y = x^k"              // ExponentiationGate          
+  , "(x,y) in T"           // LookupGate                  
+  , "N/A"                  // LookupTableGate             
+  , "z = c0*x*y"           // MultiplicationExtensionGate 
+  , "true"                 // NoopGate                    
+  , "..."                  // PoseidonGate                
+  , "..."                  // PoseidonMdsGate             
+  , "x[0..3] = hash(PI)"   // PublicInputGate             
+  , "y = x[i]"             // RandomAccessGate            
+  , "y = sum_ a^i*c_i"     // ReducingGate         
+  , "y = sum_ a^i*c_i"     // ReducingExtensionGate
+  ];
+
 function findGateIndex(gate) {
   let k = the_supported_gates.indexOf(gate);
   return ((k<0) ? 0 : k);
@@ -68,20 +88,29 @@ function test_fill_gates() {
 var gates;
 var matrix;
 var selectors;
+
 var ngates;
 var nrows;
 var ncolumns;
 var ncells;
+
+var gates_base   = []; 
+var gate_colors  = [];
+var gate_indices = [];       // index into our tables from the selector index
+
 
 function cell_hover(row,column) {
   let el_row  = document.getElementById("cell-row"   );
   let el_col  = document.getElementById("cell-column");
   let el_val  = document.getElementById("cell-value" );
   let el_gate = document.getElementById("cell-gate"  );
+  let el_equ  = document.getElementById("cell-equ"   );
+  let sel = selectors[row];
   el_row.innerHTML  = row.toString();
   el_col.innerHTML  = column.toString();
   el_val.innerHTML  = matrix[column][row].toString();
-  el_gate.innerHTML = gates[selectors[row]];
+  el_gate.innerHTML = gates[sel];
+  el_equ.innerHTML  = the_gate_equations[gate_indices[sel]];
 }
 
 function initialize_from_witness(fname,json) {
@@ -104,8 +133,6 @@ function initialize_from_witness(fname,json) {
   el_num_rows.innerHTML = nrows.toString();
   el_num_cols.innerHTML = ncolumns.toString();
 
-  let gates_base   = [];
-  let gate_colors  = [];
 
   for(let i=0; i<gates.length; i++) {
     let full = gates[i];
@@ -113,6 +140,7 @@ function initialize_from_witness(fname,json) {
     gates_base[i] = base;
 
     k = findGateIndex(base);
+    gate_indices[i] = k;
     gate_colors[i]  = the_gate_colors[k];
 
   }
