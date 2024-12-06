@@ -46,7 +46,7 @@ use crate::plonk::circuit_builder::CircuitBuilder;
 use crate::plonk::config::{GenericConfig, Hasher};
 use crate::plonk::plonk_common::PlonkOracle;
 use crate::plonk::proof::{CompressedProofWithPublicInputs, ProofWithPublicInputs};
-use crate::plonk::prover::{prove,ProverOptions,default_prover_options};
+use crate::plonk::prover::{prove,prove_with_options,ProverOptions};
 use crate::plonk::verifier::verify;
 use crate::util::serialization::{
     Buffer, GateSerializer, IoResult, Read, WitnessGeneratorSerializer, Write,
@@ -196,12 +196,11 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             &self.common,
             inputs,
             &mut TimingTree::default(),
-            &default_prover_options,
         )
     }
 
     pub fn prove_with_options(&self, inputs: PartialWitness<F>, opts: &ProverOptions) -> Result<ProofWithPublicInputs<F, C, D>> {
-        prove::<F, C, D>(
+        prove_with_options::<F, C, D>(
             &self.prover_only,
             &self.common,
             inputs,
@@ -305,12 +304,11 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             &self.common,
             inputs,
             &mut TimingTree::default(),
-            &default_prover_options,
         )
     }
 
     pub fn prove_with_options(&self, inputs: PartialWitness<F>, opts: &ProverOptions) -> Result<ProofWithPublicInputs<F, C, D>> {
-        prove::<F, C, D>(
+        prove_with_options::<F, C, D>(
             &self.prover_only,
             &self.common,
             inputs,

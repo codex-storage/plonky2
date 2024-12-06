@@ -122,7 +122,7 @@ pub struct ProverOptions {
     pub export_witness: Option<String>,      // export the full witness into the given file
 }
 
-pub const default_prover_options: ProverOptions = ProverOptions {
+pub const DEFAULT_PROVER_OPTIONS: ProverOptions = ProverOptions {
     export_witness: None,  
 };
 
@@ -150,6 +150,21 @@ fn collect_things_to_export<F: RichField + Extendable<D>, C: GenericConfig<D, F 
 //------------------------------------------------------------------------------
 
 pub fn prove<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    prover_data: &ProverOnlyCircuitData<F, C, D>,
+    common_data: &CommonCircuitData<F, D>,
+    inputs: PartialWitness<F>,
+    timing: &mut TimingTree,
+) -> Result<ProofWithPublicInputs<F, C, D>> {
+    prove_with_options(
+        prover_data,
+        common_data,
+        inputs,
+        timing,
+        &DEFAULT_PROVER_OPTIONS,
+    )
+}
+
+pub fn prove_with_options<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
     prover_data: &ProverOnlyCircuitData<F, C, D>,
     common_data: &CommonCircuitData<F, D>,
     inputs: PartialWitness<F>,
@@ -229,7 +244,7 @@ where
         None        => (),
         Some(fname) => {
             let things_to_export = collect_things_to_export::<F, C, D>( &common_data, &witness );
-            write_json_file(&fname, &things_to_export);
+            write_json_file(&fname, &things_to_export)?;
             println!("exported witness to `{}`",fname);
         },
     }

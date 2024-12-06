@@ -187,9 +187,7 @@ pub(crate) fn selector_polynomials<F: RichField + Extendable<D>, const D: usize>
     let mut selector_vector: Vec<usize> = vec![usize::MAX; n];
     for (j, g) in instances.iter().enumerate() {
         let GateInstance { gate_ref, .. } = g;
-        let i = index(gate_ref.0.id());
-        let gr = group(i);
-        selector_vector[j] = i;
+        selector_vector[j] = index(gate_ref.0.id());
     }
 
     (
