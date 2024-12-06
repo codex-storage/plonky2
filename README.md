@@ -3,6 +3,22 @@
 
 This repository was originally for Plonky2, a SNARK implementation based on techniques from PLONK and FRI. It has since expanded to include tools such as Starky, a highly performant STARK implementation.
 
+## Codex fork
+
+This repo is Codex's fork of the original Plonky2 repository at https://github.com/0xPolygonZero/plonky2/.
+
+For now at least, our modifications are in the [`codex` branch](https://github.com/codex-storage/plonky2/tree/codex).
+
+These include:
+
+- [x] option to turn off randomizing unused wires
+- [x] option to export the witness and related metadata
+- [x] simple web-based tool to visualize the witness
+- [ ] tooling to analyze circuits
+- [ ] support for Monolith hash
+- [ ] support for Poseidon2-Goldilocks hash
+- [ ] support for Poseidon2-BN254 hash (for more efficient BN254 wrapper)
+
 
 ## Documentation
 
