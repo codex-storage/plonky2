@@ -25,7 +25,7 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::{CircuitConfig, CommonCircuitData, VerifierOnlyCircuitData};
 use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, PoseidonGoldilocksConfig};
 use plonky2::plonk::proof::{CompressedProofWithPublicInputs, ProofWithPublicInputs};
-use plonky2::plonk::prover::prove;
+use plonky2::plonk::prover::{prove,prove_with_options,ProverOptions};
 use plonky2::util::serialization::DefaultGateSerializer;
 use plonky2::util::timing::TimingTree;
 use plonky2_field::extension::Extendable;
@@ -205,6 +205,7 @@ fn recursive_proof<
     InnerC: GenericConfig<D, F = F>,
     const D: usize,
 >(
+    name: &str,
     inner: &ProofTuple<F, InnerC, D>,
     config: &CircuitConfig,
     min_degree_bits: Option<usize>,
@@ -238,8 +239,12 @@ where
     pw.set_proof_with_pis_target(&pt, inner_proof)?;
     pw.set_verifier_data_target(&inner_data, inner_vd)?;
 
+    let prover_opts = ProverOptions {
+        export_witness: Some(format!("{}_witness.json",name)),
+    };
+
     let mut timing = TimingTree::new("prove", Level::Debug);
-    let proof = prove::<F, C, D>(&data.prover_only, &data.common, pw, &mut timing)?;
+    let proof = prove_with_options::<F, C, D>(&data.prover_only, &data.common, pw, &mut timing, &prover_opts)?;
     timing.print();
 
     data.verify(proof.clone())?;
@@ -324,7 +329,7 @@ pub fn benchmark_function(
     );
 
     // Recursively verify the proof
-    let middle = recursive_proof::<F, C, C, D>(&inner, config, None)?;
+    let middle = recursive_proof::<F, C, C, D>(&String::from("middle"), &inner, config, None)?;
     let (_, _, common_data) = &middle;
     info!(
         "Single recursion {} degree {} = 2^{}",
@@ -334,7 +339,7 @@ pub fn benchmark_function(
     );
 
     // Add a second layer of recursion to shrink the proof size further
-    let outer = recursive_proof::<F, C, C, D>(&middle, config, None)?;
+    let outer = recursive_proof::<F, C, C, D>(&String::from("outer"), &middle, config, None)?;
     let (proof, vd, common_data) = &outer;
     info!(
         "Double recursion {} degree {} = 2^{}",
