@@ -238,6 +238,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
         }
     }
 
+/*
     /// Same as `verify_batch_merkle_proof_to_cap`, except with the final "cap index" as separate parameter,
     /// rather than being contained in `leaf_index_bits`.
     pub(crate) fn verify_batch_merkle_proof_to_cap_with_cap_index<H: AlgebraicHasher<F>>(
@@ -293,6 +294,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
             self.connect(result, state.elements[i]);
         }
     }
+*/
 
     pub fn connect_hashes(&mut self, x: HashOutTarget, y: HashOutTarget) {
         for i in 0..NUM_HASH_OUT_ELTS {
