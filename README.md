@@ -1,11 +1,10 @@
 # Plonky2 & more
-[![Discord](https://img.shields.io/discord/743511677072572486?logo=discord)](https://discord.gg/QZKRUpqCJ6)
 
 This repository was originally for Plonky2, a SNARK implementation based on techniques from PLONK and FRI. It has since expanded to include tools such as Starky, a highly performant STARK implementation.
 
 ## Codex fork
 
-This repo is Codex's fork of the original Plonky2 repository at https://github.com/0xPolygonZero/plonky2/.
+This repo is Codex's fork of [Polygon Zero's Plonky2 repository](https://github.com/0xPolygonZero/plonky2/).
 
 For now at least, our modifications are in the [`codex` branch](https://github.com/codex-storage/plonky2/tree/codex).
 
@@ -15,10 +14,12 @@ These include:
 - [x] option to export the witness and related metadata
 - [x] simple web-based tool to visualize the witness
 - [ ] tooling to analyze circuits
-- [ ] support for Monolith hash
+- [ ] detailed documentation of how Plonky2 actually works
+- [ ] maybe some additional gates / gadgets
 - [ ] support for Poseidon2-Goldilocks hash
 - [ ] support for Poseidon2-BN254 hash (for more efficient BN254 wrapper)
-
+- [ ] support for Monolith hash (ideally also for recursion)
+- [ ] BN254 wrapper circuit (Groth16 and/or Plonk-KZG)
 
 ## Documentation
 
@@ -35,6 +36,7 @@ A good starting point for how to use Plonky2 for simple applications is the incl
 * [`fibonacci`](plonky2/examples/fibonacci.rs): Proving knowledge of the hundredth Fibonacci number
 * [`range_check`](plonky2/examples/range_check.rs): Proving that a field element is in a given range
 * [`square_root`](plonky2/examples/square_root.rs): Proving knowledge of the square root of a given field element
+* [`lookup`](plonky2/examples/lookup_example.rs): Proving that a few members of an arithmetic progression are all primes
 
 To run an example, use
 
