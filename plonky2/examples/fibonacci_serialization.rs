@@ -42,21 +42,14 @@ fn main() -> Result<()> {
 
     let data = builder.build::<C>();
 
-    let common_circuit_data_serialized = serde_json::to_string(&data.common).unwrap();
-    fs::write("common_circuit_data.json", common_circuit_data_serialized)
-        .expect("Unable to write file");
-
-    let verifier_only_circuit_data_serialized = serde_json::to_string(&data.verifier_only).unwrap();
-    fs::write(
-        "verifier_only_circuit_data.json",
-        verifier_only_circuit_data_serialized,
-    )
-    .expect("Unable to write file");
-
     let proof = data.prove(pw)?;
 
-    let proof_serialized = serde_json::to_string(&proof).unwrap();
-    fs::write("proof_with_public_inputs.json", proof_serialized).expect("Unable to write file");
+    let common_circuit_data_serialized        = serde_json::to_string(&data.common).unwrap();
+    let verifier_only_circuit_data_serialized = serde_json::to_string(&data.verifier_only).unwrap();
+    let proof_serialized                      = serde_json::to_string(&proof).unwrap();
+    fs::write("fibonacci_common.json", common_circuit_data_serialized        ).expect("Unable to write file");
+    fs::write("fibonacci_vkey.json"  , verifier_only_circuit_data_serialized ).expect("Unable to write file");
+    fs::write("fibonacci_proof.json" , proof_serialized                      ).expect("Unable to write file");
 
     println!(
         "100th Fibonacci number mod |F| (starting with {}, {}) is: {}",

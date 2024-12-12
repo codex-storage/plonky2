@@ -14,6 +14,9 @@ use core::str::FromStr;
 #[cfg(feature = "std")]
 use std::sync::Arc;
 
+use std::fs;
+use serde::Serialize;
+
 use anyhow::{anyhow, Context as _, Result};
 use itertools::Itertools;
 use log::{info, Level, LevelFilter};
@@ -212,6 +215,7 @@ fn recursive_proof<
 ) -> Result<ProofTuple<F, C, D>>
 where
     InnerC::Hasher: AlgebraicHasher<F>,
+    C: Serialize,
 {
     let (inner_proof, inner_vd, inner_cd) = inner;
     let mut builder = CircuitBuilder::<F, D>::new(config.clone());
@@ -246,6 +250,16 @@ where
     let mut timing = TimingTree::new("prove", Level::Debug);
     let proof = prove_with_options::<F, C, D>(&data.prover_only, &data.common, pw, &mut timing, &prover_opts)?;
     timing.print();
+
+/*
+    // serialize circuit data and proof
+    let common_circuit_data_serialized        = serde_json::to_string(&data.common).unwrap();
+    let verifier_only_circuit_data_serialized = serde_json::to_string(&data.verifier_only).unwrap();
+    let proof_serialized                      = serde_json::to_string(&proof).unwrap();
+    fs::write(format!("recursion_{}_common.json", name), common_circuit_data_serialized        ).expect("Unable to write file");
+    fs::write(format!("recursion_{}_vkey.json"  , name), verifier_only_circuit_data_serialized ).expect("Unable to write file");
+    fs::write(format!("recursion_{}_proof.json" , name), proof_serialized                      ).expect("Unable to write file");
+*/
 
     data.verify(proof.clone())?;
 
