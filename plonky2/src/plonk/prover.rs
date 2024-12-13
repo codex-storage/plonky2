@@ -129,21 +129,38 @@ pub const DEFAULT_PROVER_OPTIONS: ProverOptions = ProverOptions {
 // things we want to export to be used by third party tooling
 #[derive(Debug,Clone,Serialize)]
 struct ThingsToExport<F> {
-    gates:           Vec<String>,
-    selector_vector: Vec<usize>,
-    matrix:          Vec<Vec<F>>,
+    gates:             Vec<String>,    // list of gates used in the circuit
+    selector_vector:   Vec<usize>,     // the full selector vector (a gate index for each row)
+    selector_columns:  Vec<Vec<F>>,    // the selector columns (column-major)
+    constants_columns: Vec<Vec<F>>,    // the constant columns (column-major)
+    matrix:            Vec<Vec<F>>,    // the witness matrix (column-major)
+    // circuit_digest:    Vec<F>,
 }
 
 // the idea is to export the witness (plus some more information),
 // so that third-party tools can for example visualize it
 fn collect_things_to_export<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
     common_data:   &CommonCircuitData<F, D>,
+    prover_data  : &ProverOnlyCircuitData<F, C, D>,
     wires_matrix:  &MatrixWitness<F>,
 ) -> ThingsToExport<F> {
+
+    let num_consts_selectors = common_data.num_constants;
+    let num_selectors        = common_data.selectors_info.num_selectors();
+    let _num_constants       = num_consts_selectors - num_selectors;
+    let constants_vecs       = &prover_data.constants_vecs;
+    assert!( num_consts_selectors == constants_vecs.len() );
+   
+    let selector_cols: Vec<Vec<F>> = constants_vecs[0..num_selectors].to_vec();
+    let constant_cols: Vec<Vec<F>> = constants_vecs[num_selectors.. ].to_vec();
+
     ThingsToExport {
-        gates:           common_data.gates.iter().map(|g| g.0.short_id()).collect(),
-        selector_vector: common_data.selectors_info.selector_vector.clone(),
-        matrix:          wires_matrix.wire_values.clone(),
+        gates:             common_data.gates.iter().map(|g| g.0.short_id()).collect(),
+        selector_vector:   common_data.selectors_info.selector_vector.clone(),
+        selector_columns:  selector_cols,
+        constants_columns: constant_cols,
+        matrix:            wires_matrix.wire_values.clone(),
+        // circuit_digest:    prover_data.circuit_digest,
     }
 }
 
@@ -243,7 +260,7 @@ where
     match &prover_options.export_witness {
         None        => (),
         Some(fname) => {
-            let things_to_export = collect_things_to_export::<F, C, D>( &common_data, &witness );
+            let things_to_export = collect_things_to_export::<F, C, D>( &common_data, &prover_data, &witness );
             write_json_file(&fname, &things_to_export)?;
             println!("exported witness to `{}`",fname);
         },

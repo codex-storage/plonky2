@@ -1185,7 +1185,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
         let fft_root_table = fft_root_table(max_fft_points);
 
         let constants_sigmas_commitment = if commit_to_sigma {
-            let constants_sigmas_vecs = [constant_vecs, sigma_vecs.clone()].concat();
+            let constants_sigmas_vecs = [constant_vecs.clone(), sigma_vecs.clone()].concat();
             PolynomialBatch::<F, C, D>::from_values(
                 constants_sigmas_vecs,
                 rate_bits,
@@ -1296,6 +1296,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
         let prover_only = ProverOnlyCircuitData::<F, C, D> {
             generators: self.generators,
             generator_indices_by_watches,
+            constants_vecs: constant_vecs.into_iter().map(|x| x.values.clone()).collect(),
             constants_sigmas_commitment,
             sigmas: transpose_poly_values(sigma_vecs),
             subgroup,

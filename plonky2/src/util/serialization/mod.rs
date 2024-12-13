@@ -850,7 +850,15 @@ pub trait Read {
             generator_indices_by_watches.insert(k, self.read_usize_vec()?);
         }
 
+        let constants_vecs_len = self.read_usize()?;
+        let mut constants_vecs = Vec::with_capacity(constants_vecs_len);
+        for _ in 0..constants_vecs_len {
+            let vec_len = self.read_usize()?;
+            constants_vecs.push(self.read_field_vec(vec_len)?);
+        }
+
         let constants_sigmas_commitment = self.read_polynomial_batch()?;
+
         let sigmas_len = self.read_usize()?;
         let mut sigmas = Vec::with_capacity(sigmas_len);
         for _ in 0..sigmas_len {
@@ -900,6 +908,7 @@ pub trait Read {
         Ok(ProverOnlyCircuitData {
             generators,
             generator_indices_by_watches,
+            constants_vecs,
             constants_sigmas_commitment,
             sigmas,
             subgroup,
@@ -1854,6 +1863,7 @@ pub trait Write {
         let ProverOnlyCircuitData {
             generators,
             generator_indices_by_watches,
+            constants_vecs,
             constants_sigmas_commitment,
             sigmas,
             subgroup,
@@ -1874,6 +1884,12 @@ pub trait Write {
         for (k, v) in generator_indices_by_watches {
             self.write_usize(*k)?;
             self.write_usize_vec(v)?;
+        }
+
+        self.write_usize(constants_vecs.len())?;
+        for i in 0..constants_vecs.len() {
+            self.write_usize(constants_vecs[i].len())?;
+            self.write_field_vec(&constants_vecs[i])?;
         }
 
         self.write_polynomial_batch(constants_sigmas_commitment)?;
