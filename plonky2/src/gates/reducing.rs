@@ -64,7 +64,7 @@ impl<const D: usize> ReducingGate<D> {
 
 impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for ReducingGate<D> {
     fn id(&self) -> String {
-        format!("{self:?}")
+        format!("{self:?}<D={D}>")
     }
 
     fn short_id(&self) -> String {
