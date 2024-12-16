@@ -13,8 +13,8 @@
   <script language="javascript">
     window.onload = function() {
       console.log("onload!");
-      // let fname = "json/fibonacci_witness.json";
-      let fname = "json/lookup_witness.json";
+      let fname = "json/fibonacci_witness.json";
+      // let fname = "json/lookup_witness.json";
       // let fname = "json/outer_witness.json";
       load_witness(fname);
     }
@@ -51,6 +51,7 @@
         <tr>
           <th>index</th>
           <th width="200px">gate type</th>
+          <th>count</th>
         </tr>
       </table>
     </div>
@@ -61,12 +62,12 @@
 
     <div class="horiz">
       <table id="cell-properties">
-        <tr><th>property</th><th width="200px">value (hover!)</th></tr>
-        <tr><td>row     </td><td id="cell-row"   ></td></tr>
-        <tr><td>column  </td><td id="cell-column"></td></tr>
-        <tr><td>value   </td><td id="cell-value" ></td></tr>
-        <tr><td>gate    </td><td id="cell-gate"  ></td></tr>
-        <tr><td>equation</td><td id="cell-equ"   ></td></tr>
+        <tr><th>property </th><th width="200px">value (hover!)</th></tr>
+        <tr><td>gate     </td><td id="cell-gate"  ></td></tr>
+        <tr><td>position </td><td id="cell-pos"   ></td></tr>
+        <tr><td>value    </td><td id="cell-value" ></td></tr>
+        <tr><td>role     </td><td id="cell-role"  ></td></tr>
+        <tr><td>equation </td><td id="cell-equ"   ></td></tr>
       </table>
     </div>  
 
