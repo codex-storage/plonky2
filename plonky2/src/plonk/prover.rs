@@ -1,4 +1,5 @@
 //! plonky2 prover implementation.
+#![allow(non_snake_case)]
 
 #[cfg(not(feature = "std"))]
 use alloc::{format, vec, vec::Vec};
@@ -138,6 +139,31 @@ struct ThingsToExport<F> {
     // circuit_digest:    Vec<F>,
 }
 
+fn fmap_Vec<A,B>(f: &dyn Fn(&A) -> B, input: &Vec<A>) -> Vec<B> {
+    let v: Vec<B> = input.iter().map(f).collect();
+    v
+}
+
+fn fmap_VecVec<A,B>(f: &dyn Fn(&A) -> B, input: &Vec<Vec<A>>) -> Vec<Vec<B>> {
+    input.iter().map( |xs| fmap_Vec(f,xs) ).collect()
+}
+
+fn field_to_string<F: RichField>(x : &F) -> String {
+    format!("{}",x)
+}
+
+fn fmap_ThingsToExport<A,B>(f: &dyn Fn(&A) -> B, input: &ThingsToExport<A>) -> ThingsToExport<B> {
+    let output = ThingsToExport {
+        gates:                    input.gates.clone(),
+        selector_vector:          input.selector_vector.clone(),
+        gate_selector_columns:    fmap_VecVec( f , &input.gate_selector_columns    ),
+        lookup_selectors_columns: fmap_VecVec( f , &input.lookup_selectors_columns ),
+        constants_columns:        fmap_VecVec( f , &input.constants_columns        ),
+        matrix:                   fmap_VecVec( f , &input.matrix                   ),
+    };
+    output
+}
+
 // the idea is to export the witness (plus some more information),
 // so that third-party tools can for example visualize it
 fn collect_things_to_export<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
@@ -266,8 +292,9 @@ where
     match &prover_options.export_witness {
         None        => (),
         Some(fname) => {
-            let things_to_export = collect_things_to_export::<F, C, D>( &common_data, &prover_data, &witness );
-            write_json_file(&fname, &things_to_export)?;
+            let to_export_felt : ThingsToExport<F>      = collect_things_to_export::<F, C, D>( &common_data, &prover_data, &witness );
+            let to_export_str  : ThingsToExport<String> = fmap_ThingsToExport( &field_to_string , &to_export_felt );
+            write_json_file(&fname, &to_export_str)?;
             println!("exported witness to `{}`",fname);
         },
     }

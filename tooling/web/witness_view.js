@@ -251,6 +251,21 @@ function cell_hover(row,column) {
   el_gate.style.background = gate_colors[sel];
 }
 
+// parseInt behaves like seriously WTF here...
+function myParseInt(what) {
+  if (typeof what == "string") {
+    return parseInt(what);
+  }
+  else {
+    return what;
+  }
+}
+
+// from String to BigInt
+function convertMatrix(matrix) {
+  return matrix.map( (vector) => vector.map(BigInt) );
+}
+
 function initialize_from_witness(fname,json) {
   //console.log(json);
 
@@ -259,8 +274,8 @@ function initialize_from_witness(fname,json) {
 
   // these are global variables!
   gates     = json.gates;
-  matrix    = json.matrix;
-  selectors = json.selector_vector;
+  matrix    = convertMatrix(json.matrix);
+  selectors = json.selector_vector.map(myParseInt);
   ngates    = gates.length;
   nrows     = selectors.length;
   ncolumns  = matrix.length
