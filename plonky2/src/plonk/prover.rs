@@ -129,11 +129,12 @@ pub const DEFAULT_PROVER_OPTIONS: ProverOptions = ProverOptions {
 // things we want to export to be used by third party tooling
 #[derive(Debug,Clone,Serialize)]
 struct ThingsToExport<F> {
-    gates:             Vec<String>,    // list of gates used in the circuit
-    selector_vector:   Vec<usize>,     // the full selector vector (a gate index for each row)
-    selector_columns:  Vec<Vec<F>>,    // the selector columns (column-major)
-    constants_columns: Vec<Vec<F>>,    // the constant columns (column-major)
-    matrix:            Vec<Vec<F>>,    // the witness matrix (column-major)
+    gates:                    Vec<String>,    // list of gates used in the circuit
+    selector_vector:          Vec<usize> ,    // the full selector vector (a gate index for each row)
+    gate_selector_columns:    Vec<Vec<F>>,    // the gate selector columns (column-major)
+    lookup_selectors_columns: Vec<Vec<F>>,    // the lookup selector columns (there are 5 of them?)
+    constants_columns:        Vec<Vec<F>>,    // the constant columns (column-major)
+    matrix:                   Vec<Vec<F>>,    // the witness matrix (column-major)
     // circuit_digest:    Vec<F>,
 }
 
@@ -147,20 +148,25 @@ fn collect_things_to_export<F: RichField + Extendable<D>, C: GenericConfig<D, F 
 
     let num_consts_selectors = common_data.num_constants;
     let num_selectors        = common_data.selectors_info.num_selectors();
+    let num_lkp_selectors    = common_data.num_lookup_selectors;
     let _num_constants       = num_consts_selectors - num_selectors;
     let constants_vecs       = &prover_data.constants_vecs;
     assert!( num_consts_selectors == constants_vecs.len() );
-   
-    let selector_cols: Vec<Vec<F>> = constants_vecs[0..num_selectors].to_vec();
-    let constant_cols: Vec<Vec<F>> = constants_vecs[num_selectors.. ].to_vec();
+
+    let b = num_selectors;
+    let c = num_selectors + num_lkp_selectors;
+    let selector_cols: Vec<Vec<F>> = constants_vecs[0..b].to_vec();
+    let lookup_cols:   Vec<Vec<F>> = constants_vecs[b..c].to_vec();
+    let constant_cols: Vec<Vec<F>> = constants_vecs[c.. ].to_vec();
 
     ThingsToExport {
-        gates:             common_data.gates.iter().map(|g| g.0.short_id()).collect(),
-        selector_vector:   common_data.selectors_info.selector_vector.clone(),
-        selector_columns:  selector_cols,
-        constants_columns: constant_cols,
-        matrix:            wires_matrix.wire_values.clone(),
-        // circuit_digest:    prover_data.circuit_digest,
+        gates:                     common_data.gates.iter().map(|g| g.0.short_id()).collect(),
+        selector_vector:           common_data.selectors_info.selector_vector.clone(),
+        gate_selector_columns:     selector_cols,
+        lookup_selectors_columns:  lookup_cols,
+        constants_columns:         constant_cols,
+        matrix:                    wires_matrix.wire_values.clone(),
+        // circuit_digest:            prover_data.circuit_digest,
     }
 }
 
