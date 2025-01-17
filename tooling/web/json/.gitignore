@@ -1,3 +1,4 @@
 *.json
 !fibonacci_witness.json
 !lookup_witness.json
+!multi_lookup_witness.json
