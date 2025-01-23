@@ -148,6 +148,8 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for RandomAccessGa
     fn eval_unfiltered(&self, vars: EvaluationVars<F, D>) -> Vec<F::Extension> {
         let mut constraints = Vec::with_capacity(self.num_constraints());
 
+        // println!("self.routed_wires = {}",self.num_routed_wires() );
+
         for copy in 0..self.num_copies {
             let access_index = vars.local_wires[self.wire_access_index(copy)];
             let mut list_items = (0..self.vec_size())
@@ -157,6 +159,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for RandomAccessGa
             let bits = (0..self.bits)
                 .map(|i| vars.local_wires[self.wire_bit(i, copy)])
                 .collect::<Vec<_>>();
+
+            // for i in 0..self.bits {
+            //   println!("copy = {} | i = {}  ->  wire = {}",copy,i, self.wire_bit(i,copy));
+            // }
 
             // Assert that each bit wire value is indeed boolean.
             for &b in &bits {

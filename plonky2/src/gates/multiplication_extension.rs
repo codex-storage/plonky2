@@ -81,7 +81,10 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for MulExtensionGa
             let output = vars.get_local_ext_algebra(Self::wires_ith_output(i));
             let computed_output = (multiplicand_0 * multiplicand_1).scalar_mul(const_0);
 
-            constraints.extend((output - computed_output).to_basefield_array());
+            // constraints.extend((output - computed_output).to_basefield_array());
+            let diff    = output - computed_output;
+            let bae_arr = diff.to_basefield_array();
+            constraints.extend(bae_arr);
         }
 
         constraints

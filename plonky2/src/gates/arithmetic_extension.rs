@@ -87,7 +87,13 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for ArithmeticExte
             let computed_output =
                 (multiplicand_0 * multiplicand_1).scalar_mul(const_0) + addend.scalar_mul(const_1);
 
-            constraints.extend((output - computed_output).to_basefield_array());
+            // constraints.extend((output - computed_output).to_basefield_array());
+            let diff     = output - computed_output;
+            let base_arr = diff.to_basefield_array();
+            // println!("mult_0 = {:?}",multiplicand_0);
+            // println!("diff     = {:?}",diff);
+            // println!("base_arr = {:?}",base_arr);
+            constraints.extend(base_arr);
         }
 
         constraints

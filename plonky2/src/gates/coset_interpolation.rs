@@ -86,6 +86,13 @@ impl<F: RichField + Extendable<D>, const D: usize> CosetInterpolationGate<F, D> 
                 .map(|x| (x, F::ZERO))
                 .collect::<Vec<_>>(),
         );
+ 
+        // println!("subgroup_bits   = {}",subgroup_bits);
+        // println!("max_degree      = {}",max_degree);
+        // println!("n_points        = {}",n_points);
+        // println!("n_intermediates = {}",n_intermediates);
+        // println!("degree          = {}",degree);
+        // println!("barycentric_weights = {:?}",barycentric_weights);
 
         Self {
             subgroup_bits,
@@ -228,6 +235,8 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for CosetInterpola
             ExtensionAlgebra::one(),
         );
 
+        // println!("self.degree = {}",self.degree());
+
         for i in 0..self.num_intermediates() {
             let intermediate_eval = vars.get_local_ext_algebra(self.wires_intermediate_eval(i));
             let intermediate_prod = vars.get_local_ext_algebra(self.wires_intermediate_prod(i));
@@ -236,6 +245,7 @@ impl<F: RichField + Extendable<D>, const D: usize> Gate<F, D> for CosetInterpola
 
             let start_index = 1 + (self.degree() - 1) * (i + 1);
             let end_index = (start_index + self.degree() - 1).min(self.num_points());
+            // println!("(start,end) = ({},{})",start_index,end_index);
             (computed_eval, computed_prod) = partial_interpolate_ext_algebra(
                 &domain[start_index..end_index],
                 &values[start_index..end_index],
@@ -877,3 +887,4 @@ mod tests {
         assert_eq!(gate.num_constraints(), 4);
     }
 }
+

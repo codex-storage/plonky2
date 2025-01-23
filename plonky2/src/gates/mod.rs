@@ -43,6 +43,7 @@ pub mod reducing;
 pub mod reducing_extension;
 pub(crate) mod selectors;
 pub mod util;
+pub mod test_gate_constraints;
 
 // Can't use #[cfg(test)] here because it needs to be visible to other crates.
 // See https://github.com/rust-lang/cargo/issues/8379
