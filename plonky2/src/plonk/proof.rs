@@ -26,7 +26,7 @@ use crate::iop::ext_target::ExtensionTarget;
 use crate::iop::target::Target;
 use crate::plonk::circuit_data::{CommonCircuitData, VerifierOnlyCircuitData};
 use crate::plonk::config::{GenericConfig, Hasher};
-use crate::plonk::verifier::verify_with_challenges;
+use crate::plonk::verifier::{verify_with_challenges, DEFAULT_VERIFIER_OPTIONS};
 use crate::util::serialization::{Buffer, Read, Write};
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, PartialEq)]
@@ -227,6 +227,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             challenges,
             verifier_data,
             common_data,
+            &DEFAULT_VERIFIER_OPTIONS,
         )
     }
 

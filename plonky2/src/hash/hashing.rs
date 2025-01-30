@@ -10,6 +10,71 @@ use crate::iop::target::Target;
 use crate::plonk::circuit_builder::CircuitBuilder;
 use crate::plonk::config::AlgebraicHasher;
 
+use strum_macros::FromRepr;
+use std::sync::atomic::{AtomicUsize,Ordering};
+
+//------------------------------------------------------------------------------
+// hash usage statistics
+
+#[derive(Copy, Clone, Debug, FromRepr)]
+pub enum HashUsage { 
+    Permutation,
+    Compress,
+//    Sponge,
+//    Duplex,
+}
+
+impl HashUsage {
+    pub fn from_usize(v: usize) -> HashUsage {
+        HashUsage::from_repr(v.try_into().unwrap()).unwrap()
+    }
+}
+
+const ATOMIC_ORDER: Ordering = Ordering::SeqCst;
+
+#[derive(Debug)]
+pub struct HashCounter {
+    current_usage:  AtomicUsize,
+    count_permute:  AtomicUsize,
+    count_compress: AtomicUsize,
+}
+
+static the_hash_counters: HashCounter = HashCounter {
+    current_usage:  AtomicUsize::new(HashUsage::Permutation as usize),
+    count_permute:  AtomicUsize::new(0),
+    count_compress: AtomicUsize::new(0),
+};
+
+pub fn reset_hash_counters() {
+    the_hash_counters.current_usage .store(HashUsage::Permutation as usize, ATOMIC_ORDER);
+    the_hash_counters.count_permute .store(0, ATOMIC_ORDER );
+    the_hash_counters.count_compress.store(0, ATOMIC_ORDER );
+}
+
+pub fn set_current_hash_usage(what: HashUsage) {
+    the_hash_counters.current_usage.store(what as usize, ATOMIC_ORDER);
+}
+
+pub fn increment_given_hash_counter(which: HashUsage) {
+    let _ = match which {
+        HashUsage::Permutation => the_hash_counters.count_permute .fetch_add(1, ATOMIC_ORDER),
+        HashUsage::Compress    => the_hash_counters.count_compress.fetch_add(1, ATOMIC_ORDER),
+    };
+} 
+
+pub fn increment_current_hash_counter() {
+    let cur = the_hash_counters.current_usage.load(ATOMIC_ORDER);
+    increment_given_hash_counter(HashUsage::from_usize(cur));
+} 
+
+pub fn print_hash_counters(msg: &str) {
+    let nperms = the_hash_counters.count_permute.load(ATOMIC_ORDER);
+    println!("hash statistic ({})",msg);
+    println!("  - number of permutations = {}",nperms);
+}
+
+//------------------------------------------------------------------------------
+
 impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
     pub fn hash_or_noop<H: AlgebraicHasher<F>>(&mut self, inputs: Vec<Target>) -> HashOutTarget {
         let zero = self.zero();

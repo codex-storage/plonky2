@@ -10,6 +10,7 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::{CircuitConfig,CircuitData};
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
 use plonky2::plonk::prover::ProverOptions;
+use plonky2::plonk::verifier::{VerifierOptions, HashStatisticsPrintLevel};
 
 //use plonky2::gadgets::lookup;
 
@@ -142,6 +143,7 @@ fn main() -> Result<()> {
 
     let prover_opts = ProverOptions {
         export_witness: Some(String::from("lookup_witness.json")),
+        print_hash_statistics: HashStatisticsPrintLevel::None,
     };
     let proof = data.prove_with_options(pw, &prover_opts)?;
 

@@ -17,6 +17,7 @@ use crate::hash::hash_types::RichField;
 use crate::hash::merkle_tree::MerkleTree;
 use crate::iop::challenger::Challenger;
 use crate::plonk::config::GenericConfig;
+use crate::plonk::prover::ProverOptions;
 use crate::timed;
 use crate::util::reducing::ReducingFactor;
 use crate::util::timing::TimingTree;
@@ -181,6 +182,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
         final_poly_coeff_len: Option<usize>,
         max_num_query_steps: Option<usize>,
         timing: &mut TimingTree,
+        prover_options: &ProverOptions,
     ) -> FriProof<F, C::Hasher, D> {
         assert!(D > 1, "Not implemented for D=1.");
         let alpha = challenger.get_extension_challenge::<D>();
@@ -231,6 +233,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             final_poly_coeff_len,
             max_num_query_steps,
             timing,
+            prover_options,
         );
 
         fri_proof

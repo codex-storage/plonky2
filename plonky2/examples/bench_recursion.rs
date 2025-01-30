@@ -28,7 +28,8 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::{CircuitConfig, CommonCircuitData, VerifierOnlyCircuitData};
 use plonky2::plonk::config::{AlgebraicHasher, GenericConfig, PoseidonGoldilocksConfig};
 use plonky2::plonk::proof::{CompressedProofWithPublicInputs, ProofWithPublicInputs};
-use plonky2::plonk::prover::{prove,prove_with_options,ProverOptions};
+use plonky2::plonk::prover::{prove, prove_with_options, ProverOptions};
+use plonky2::plonk::verifier::{VerifierOptions, HashStatisticsPrintLevel};
 use plonky2::util::serialization::DefaultGateSerializer;
 use plonky2::util::timing::TimingTree;
 use plonky2_field::extension::Extendable;
@@ -245,6 +246,7 @@ where
 
     let prover_opts = ProverOptions {
         export_witness: Some(format!("{}_witness.json",name)),
+        print_hash_statistics: HashStatisticsPrintLevel::Summary,  // ::None,
     };
 
     let mut timing = TimingTree::new("prove", Level::Debug);
@@ -261,7 +263,10 @@ where
     fs::write(format!("recursion_{}_proof.json" , name), proof_serialized                      ).expect("Unable to write file");
 */
 
-    data.verify(proof.clone())?;
+    let verifier_opts = VerifierOptions {
+        print_hash_statistics: HashStatisticsPrintLevel::Summary,
+    };
+    data.verify_with_options(proof.clone(), &verifier_opts)?;
 
     Ok((proof, data.verifier_only, data.common))
 }

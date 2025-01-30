@@ -11,11 +11,13 @@ use crate::field::polynomial::{PolynomialCoeffs, PolynomialValues};
 use crate::fri::proof::{FriInitialTreeProof, FriProof, FriQueryRound, FriQueryStep};
 use crate::fri::{FriConfig, FriParams};
 use crate::hash::hash_types::{RichField, NUM_HASH_OUT_ELTS};
-use crate::hash::hashing::PlonkyPermutation;
+use crate::hash::hashing::*;
 use crate::hash::merkle_tree::MerkleTree;
 use crate::iop::challenger::Challenger;
 use crate::plonk::config::GenericConfig;
 use crate::plonk::plonk_common::reduce_with_powers;
+use crate::plonk::prover::ProverOptions;
+use crate::plonk::verifier::HashStatisticsPrintLevel;
 use crate::timed;
 use crate::util::reverse_index_bits_in_place;
 use crate::util::timing::TimingTree;
@@ -32,6 +34,7 @@ pub fn fri_proof<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const
     final_poly_coeff_len: Option<usize>,
     max_num_query_steps: Option<usize>,
     timing: &mut TimingTree,
+    prover_options: &ProverOptions,
 ) -> FriProof<F, C::Hasher, D> {
     let n = lde_polynomial_values.len();
     assert_eq!(lde_polynomial_coeffs.len(), n);
@@ -50,12 +53,20 @@ pub fn fri_proof<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const
         )
     );
 
+    if prover_options.print_hash_statistics >= HashStatisticsPrintLevel::Debug {
+        print_hash_counters("after commit phase");
+    }
+
     // PoW phase
     let pow_witness = timed!(
         timing,
         "find proof-of-work witness",
         fri_proof_of_work::<F, C, D>(challenger, &fri_params.config)
     );
+
+    if prover_options.print_hash_statistics >= HashStatisticsPrintLevel::Debug {
+        print_hash_counters("after PoW grinding");
+    }
 
     // Query phase
     let query_round_proofs =
@@ -180,6 +191,8 @@ pub(crate) fn fri_proof_of_work<
     let witness_input_pos = challenger.input_buffer.len();
     duplex_intermediate_state.set_from_iter(challenger.input_buffer.clone(), 0);
 
+    // println!("duplex_intermediate_state = {:?}", duplex_intermediate_state);
+
     let pow_witness = (0..=F::NEG_ONE.to_canonical_u64())
         .into_par_iter()
         .find_any(|&candidate| {
@@ -192,6 +205,8 @@ pub(crate) fn fri_proof_of_work<
         })
         .map(F::from_canonical_u64)
         .expect("Proof of work failed. This is highly unlikely!");
+
+    // println!("pow_witness = {:?}",pow_witness);
 
     // Recompute pow_response using our normal Challenger code, and make sure it matches.
     challenger.observe_element(pow_witness);

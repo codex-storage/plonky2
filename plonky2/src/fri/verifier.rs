@@ -13,9 +13,11 @@ use crate::fri::{FriConfig, FriParams};
 use crate::hash::hash_types::RichField;
 use crate::hash::merkle_proofs::verify_merkle_proof_to_cap;
 use crate::hash::merkle_tree::MerkleCap;
+use crate::hash::hashing::*;
 use crate::plonk::config::{GenericConfig, Hasher};
 use crate::util::reducing::ReducingFactor;
 use crate::util::{log2_strict, reverse_bits, reverse_index_bits_in_place};
+use crate::plonk::verifier::{VerifierOptions, HashStatisticsPrintLevel};
 
 /// Computes P'(x^arity) from {P(x*g^i)}_(i=0..arity), where g is a `arity`-th root of unity
 /// and P' is the FRI reduced polynomial.
@@ -70,6 +72,7 @@ pub fn verify_fri_proof<
     initial_merkle_caps: &[MerkleCap<F, C::Hasher>],
     proof: &FriProof<F, C::Hasher, D>,
     params: &FriParams,
+    verify_options: &VerifierOptions,
 ) -> Result<()> {
     validate_fri_proof_shape::<F, C, D>(proof, instance, params)?;
 
@@ -87,10 +90,11 @@ pub fn verify_fri_proof<
 
     let precomputed_reduced_evals =
         PrecomputedReducedOpenings::from_os_and_alpha(openings, challenges.fri_alpha);
-    for (&x_index, round_proof) in challenges
+    for (round_counter,(&x_index, round_proof)) in challenges
         .fri_query_indices
         .iter()
         .zip(&proof.query_round_proofs)
+        .enumerate()
     {
         fri_verifier_query_round::<F, C, D>(
             instance,
@@ -102,7 +106,14 @@ pub fn verify_fri_proof<
             n,
             round_proof,
             params,
+            verify_options,
         )?;
+
+        if verify_options.print_hash_statistics >= HashStatisticsPrintLevel::Debug {
+           let s = format!("after query round #{}",round_counter);
+           print_hash_counters(&s);
+        }
+
     }
 
     Ok(())
@@ -175,6 +186,7 @@ fn fri_verifier_query_round<
     n: usize,
     round_proof: &FriQueryRound<F, C::Hasher, D>,
     params: &FriParams,
+    verify_options: &VerifierOptions,
 ) -> Result<()> {
     fri_verify_initial_proof::<F, C::Hasher>(
         x_index,
@@ -196,6 +208,11 @@ fn fri_verifier_query_round<
         precomputed_reduced_evals,
         params,
     );
+
+    if verify_options.print_hash_statistics >= HashStatisticsPrintLevel::Debug {
+       let s = format!("after combine_initial");
+       print_hash_counters(&s);
+    }
 
     for (i, &arity_bits) in params.reduction_arity_bits.iter().enumerate() {
         let arity = 1 << arity_bits;
@@ -223,6 +240,11 @@ fn fri_verifier_query_round<
             &proof.commit_phase_merkle_caps[i],
             &round_proof.steps[i].merkle_proof,
         )?;
+
+        if verify_options.print_hash_statistics >= HashStatisticsPrintLevel::Debug {
+           let s = format!("after folding step #{}",i);
+           print_hash_counters(&s);
+        }
 
         // Update the point x to x^arity.
         subgroup_x = subgroup_x.exp_power_of_2(arity_bits);

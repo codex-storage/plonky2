@@ -6,6 +6,7 @@ use crate::field::extension::Extendable;
 use crate::field::types::Field;
 use crate::fri::verifier::verify_fri_proof;
 use crate::hash::hash_types::RichField;
+use crate::hash::hashing::*;
 use crate::plonk::circuit_data::{CommonCircuitData, VerifierOnlyCircuitData};
 use crate::plonk::config::{GenericConfig, Hasher};
 use crate::plonk::plonk_common::reduce_with_powers;
@@ -14,27 +15,76 @@ use crate::plonk::validate_shape::validate_proof_with_pis_shape;
 use crate::plonk::vanishing_poly::eval_vanishing_poly;
 use crate::plonk::vars::EvaluationVars;
 
+// debugging features in the verifier
+#[derive(Debug,Clone,PartialEq,PartialOrd)]
+pub enum HashStatisticsPrintLevel {
+    None,
+    Summary,
+    Info,
+    Debug,
+}
+
+#[derive(Debug,Clone)]
+pub struct VerifierOptions {
+    pub print_hash_statistics: HashStatisticsPrintLevel,
+}
+
+pub const DEFAULT_VERIFIER_OPTIONS: VerifierOptions = VerifierOptions {
+    print_hash_statistics: HashStatisticsPrintLevel::None,
+};
+
 pub(crate) fn verify<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
     proof_with_pis: ProofWithPublicInputs<F, C, D>,
     verifier_data: &VerifierOnlyCircuitData<C, D>,
     common_data: &CommonCircuitData<F, D>,
 ) -> Result<()> {
+    verify_with_options(
+        proof_with_pis,
+        verifier_data,
+        common_data,
+        &DEFAULT_VERIFIER_OPTIONS,
+    )
+}
+pub(crate) fn verify_with_options<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    proof_with_pis: ProofWithPublicInputs<F, C, D>,
+    verifier_data: &VerifierOnlyCircuitData<C, D>,
+    common_data: &CommonCircuitData<F, D>,
+    verifier_options: &VerifierOptions,
+) -> Result<()> {
+
+    reset_hash_counters();
+
     validate_proof_with_pis_shape(&proof_with_pis, common_data)?;
 
     let public_inputs_hash = proof_with_pis.get_public_inputs_hash();
+
+    if verifier_options.print_hash_statistics >= HashStatisticsPrintLevel::Info {
+        print_hash_counters("after PI");
+    }
+
     let challenges = proof_with_pis.get_challenges(
         public_inputs_hash,
         &verifier_data.circuit_digest,
         common_data,
     )?;
 
-    verify_with_challenges::<F, C, D>(
+    if verifier_options.print_hash_statistics >= HashStatisticsPrintLevel::Info {
+        print_hash_counters("after challenges");
+    }
+
+    let result = verify_with_challenges::<F, C, D>(
         proof_with_pis.proof,
         public_inputs_hash,
         challenges,
         verifier_data,
         common_data,
-    )
+        verifier_options
+    );
+
+    if verifier_options.print_hash_statistics >= HashStatisticsPrintLevel::Summary {
+        print_hash_counters("verify total");
+    }
+    result
 }
 
 pub(crate) fn verify_with_challenges<
@@ -47,6 +97,7 @@ pub(crate) fn verify_with_challenges<
     challenges: ProofChallenges<F, D>,
     verifier_data: &VerifierOnlyCircuitData<C, D>,
     common_data: &CommonCircuitData<F, D>,
+    verifier_options: &VerifierOptions,
 ) -> Result<()> {
     let local_constants = &proof.openings.constants;
     let local_wires = &proof.openings.wires;
@@ -112,6 +163,7 @@ pub(crate) fn verify_with_challenges<
         merkle_caps,
         &proof.opening_proof,
         &common_data.fri_params,
+        &verifier_options,
     )?;
 
     Ok(())

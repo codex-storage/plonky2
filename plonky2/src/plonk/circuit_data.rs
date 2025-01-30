@@ -46,8 +46,8 @@ use crate::plonk::circuit_builder::CircuitBuilder;
 use crate::plonk::config::{GenericConfig, Hasher};
 use crate::plonk::plonk_common::PlonkOracle;
 use crate::plonk::proof::{CompressedProofWithPublicInputs, ProofWithPublicInputs};
-use crate::plonk::prover::{prove,prove_with_options,ProverOptions};
-use crate::plonk::verifier::verify;
+use crate::plonk::prover::{prove, prove_with_options, ProverOptions};
+use crate::plonk::verifier::{verify, verify_with_options, VerifierOptions};
 use crate::util::serialization::{
     Buffer, GateSerializer, IoResult, Read, WitnessGeneratorSerializer, Write,
 };
@@ -211,6 +211,10 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
 
     pub fn verify(&self, proof_with_pis: ProofWithPublicInputs<F, C, D>) -> Result<()> {
         verify::<F, C, D>(proof_with_pis, &self.verifier_only, &self.common)
+    }
+
+    pub fn verify_with_options(&self, proof_with_pis: ProofWithPublicInputs<F, C, D>, verifier_options: &VerifierOptions) -> Result<()> {
+        verify_with_options::<F, C, D>(proof_with_pis, &self.verifier_only, &self.common, verifier_options)
     }
 
     pub fn verify_compressed(

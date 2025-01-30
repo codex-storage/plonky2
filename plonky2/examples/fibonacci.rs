@@ -5,6 +5,7 @@ use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
 use plonky2::plonk::prover::ProverOptions;
+use plonky2::plonk::verifier::{VerifierOptions, HashStatisticsPrintLevel};
 
 /// An example of using Plonky2 to prove a statement of the form
 /// "I know the 100th element of the Fibonacci sequence, starting with constants a and b."
@@ -42,6 +43,7 @@ fn main() -> Result<()> {
 
     let prover_opts = ProverOptions {
         export_witness: Some(String::from("fibonacci_witness.json")),
+        print_hash_statistics: HashStatisticsPrintLevel::Info,
     };
   
     let proof = data.prove_with_options(pw, &prover_opts)?;
@@ -51,5 +53,9 @@ fn main() -> Result<()> {
         proof.public_inputs[0], proof.public_inputs[1], proof.public_inputs[2]
     );
 
-    data.verify(proof)
+    let verifier_opts = VerifierOptions {
+        print_hash_statistics: HashStatisticsPrintLevel::Summary,
+    };
+    data.verify_with_options(proof, &verifier_opts)
+
 }

@@ -15,6 +15,7 @@ use crate::gates::poseidon::PoseidonGate;
 use crate::gates::poseidon_mds::PoseidonMdsGate;
 use crate::hash::hash_types::{HashOut, RichField};
 use crate::hash::hashing::{compress, hash_n_to_hash_no_pad, PlonkyPermutation};
+use crate::hash::hashing::{HashUsage, increment_given_hash_counter};
 use crate::iop::ext_target::ExtensionTarget;
 use crate::iop::target::{BoolTarget, Target};
 use crate::plonk::circuit_builder::CircuitBuilder;
@@ -862,6 +863,7 @@ impl<T: Copy + Debug + Default + Eq + Permuter + Send + Sync> PlonkyPermutation<
 
     fn permute(&mut self) {
         self.state = T::permute(self.state);
+        increment_given_hash_counter(HashUsage::Permutation);
     }
 
     fn squeeze(&self) -> &[T] {

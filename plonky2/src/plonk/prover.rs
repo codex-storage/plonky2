@@ -23,6 +23,7 @@ use crate::gates::lookup::LookupGate;
 use crate::gates::lookup_table::LookupTableGate;
 use crate::gates::selectors::{LookupSelectors};
 use crate::hash::hash_types::RichField;
+use crate::hash::hashing::*;
 use crate::iop::challenger::Challenger;
 use crate::iop::generator::generate_partial_witness;
 use crate::iop::target::Target;
@@ -33,6 +34,7 @@ use crate::plonk::config::{GenericConfig, Hasher};
 use crate::plonk::plonk_common::PlonkOracle;
 use crate::plonk::proof::{OpeningSet, Proof, ProofWithPublicInputs};
 use crate::plonk::vanishing_poly::{eval_vanishing_poly_base_batch, get_lut_poly};
+use crate::plonk::verifier::HashStatisticsPrintLevel;
 use crate::plonk::vars::EvaluationVarsBaseBatch;
 use crate::timed;
 use crate::util::partial_products::{partial_products_and_z_gx, quotient_chunk_products};
@@ -121,10 +123,12 @@ pub fn set_lookup_wires<
 #[derive(Debug,Clone)]
 pub struct ProverOptions {
     pub export_witness: Option<String>,      // export the full witness into the given file
+    pub print_hash_statistics: HashStatisticsPrintLevel,
 }
 
 pub const DEFAULT_PROVER_OPTIONS: ProverOptions = ProverOptions {
-    export_witness: None,  
+    export_witness:        None,  
+    print_hash_statistics: HashStatisticsPrintLevel::None,
 };
 
 // things we want to export to be used by third party tooling
@@ -223,14 +227,23 @@ pub fn prove_with_options<F: RichField + Extendable<D>, C: GenericConfig<D, F = 
 where
     C::Hasher: Hasher<F>,
     C::InnerHasher: Hasher<F>,
+
 {
+    reset_hash_counters();
+
     let partition_witness = timed!(
         timing,
         &format!("run {} generators", prover_data.generators.len()),
         generate_partial_witness(inputs, prover_data, common_data)?
     );
 
-    prove_with_partition_witness(prover_data, common_data, partition_witness, timing, prover_options)
+    let result = prove_with_partition_witness(prover_data, common_data, partition_witness, timing, prover_options);
+
+    if prover_options.print_hash_statistics >= HashStatisticsPrintLevel::Summary {
+        print_hash_counters("prover total");
+    }
+
+    result
 }
 
 pub fn prove_with_partition_witness<
@@ -287,6 +300,10 @@ where
             prover_data.fft_root_table.as_ref(),
         )
     );
+
+    if prover_options.print_hash_statistics >= HashStatisticsPrintLevel::Info {
+        print_hash_counters("after wires commitment");
+    }
 
     // export witness etc for third party tooling
     match &prover_options.export_witness {
@@ -366,6 +383,10 @@ where
         )
     );
 
+    if prover_options.print_hash_statistics >= HashStatisticsPrintLevel::Info {
+        print_hash_counters("after partial product and lookup commitment");
+    }
+
     challenger.observe_cap::<C::Hasher>(&partial_products_zs_and_lookup_commitment.merkle_tree.cap);
 
     let alphas = challenger.get_n_challenges(num_challenges);
@@ -414,6 +435,10 @@ where
         )
     );
 
+    if prover_options.print_hash_statistics >= HashStatisticsPrintLevel::Info {
+        print_hash_counters("after quotient poly commitment");
+    }
+
     challenger.observe_cap::<C::Hasher>(&quotient_polys_commitment.merkle_tree.cap);
 
     let zeta = challenger.get_extension_challenge::<D>();
@@ -436,11 +461,15 @@ where
             &wires_commitment,
             &partial_products_zs_and_lookup_commitment,
             &quotient_polys_commitment,
-            common_data
+            common_data,
         )
     );
     challenger.observe_openings(&openings.to_fri_openings());
     let instance = common_data.get_fri_instance(zeta);
+
+    if prover_options.print_hash_statistics >= HashStatisticsPrintLevel::Info {
+        print_hash_counters("before FRI opening proof");
+    }
 
     let opening_proof = timed!(
         timing,
@@ -458,6 +487,7 @@ where
             None,
             None,
             timing,
+            prover_options,
         )
     );
 
