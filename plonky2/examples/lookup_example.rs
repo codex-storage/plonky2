@@ -16,7 +16,8 @@ use plonky2::plonk::verifier::{VerifierOptions, HashStatisticsPrintLevel};
 
 use env_logger;
 
-pub const N_PRIMES: usize = 512;
+pub const N_PRIMES:   usize = 512;
+pub const TABLE_SIZE: usize = 512;   // 19*26;
 
 // table of the first 512 prime numbers
 pub const PRIMES_TABLE: [u16; N_PRIMES]  = [
@@ -101,8 +102,8 @@ fn main() -> Result<()> {
     let config = CircuitConfig::standard_recursion_config();
     let mut builder = CircuitBuilder::<F, D>::new(config);
 
-    let indices: [u16; N_PRIMES] = core::array::from_fn( |i| i as u16 );
-    let my_lut_index = builder.add_lookup_table_from_table( &PRIMES_TABLE , &indices );
+    let indices: [u16; TABLE_SIZE] = core::array::from_fn( |i| i as u16 );
+    let my_lut_index = builder.add_lookup_table_from_table( &PRIMES_TABLE[..TABLE_SIZE] , &indices );
 
     // The arithmetic circuit.
     let the_a    = builder.add_virtual_target();
@@ -147,15 +148,13 @@ fn main() -> Result<()> {
     };
     let proof = data.prove_with_options(pw, &prover_opts)?;
 
-/*
     // serialize circuit into JSON
     let common_circuit_data_serialized        = serde_json::to_string(&data.common       ).unwrap();
     let verifier_only_circuit_data_serialized = serde_json::to_string(&data.verifier_only).unwrap();
     let proof_serialized                      = serde_json::to_string(&proof             ).unwrap();
-    fs::write("lookup_common_circuit_data.json"       , common_circuit_data_serialized)       .expect("Unable to write file");
-    fs::write("lookup_verifier_only_circuit_data.json", verifier_only_circuit_data_serialized).expect("Unable to write file");
-    fs::write("lookup_proof_with_public_inputs.json"  , proof_serialized)                     .expect("Unable to write file");
-*/
+    fs::write("lookup_common.json"  , common_circuit_data_serialized)       .expect("Unable to write file");
+    fs::write("lookup_vkey.json"    , verifier_only_circuit_data_serialized).expect("Unable to write file");
+    fs::write("lookup_proof.json"   , proof_serialized)                     .expect("Unable to write file");
 
     println!("the arithmetic progression `q[i] := {}*i + {}` for 0<=i<{} are all primes!",proof.public_inputs[0],proof.public_inputs[1],nn);
     println!("sum of the indices of these primes = {}",proof.public_inputs[2]);
