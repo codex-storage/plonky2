@@ -35,6 +35,8 @@ unroll = { workspace = true }
 web-time = { version = "1.0.0", optional = true }
 strum = "0.26"
 strum_macros = "0.26"
+rust-bn254-hash = {git = "https://github.com/codex-storage/rust-bn254-hash.git"}
+ark-serialize = {version = "0.5.0"}
 
 # Local dependencies
 plonky2_field = { version = "1.0.0", path = "../field", default-features = false }
