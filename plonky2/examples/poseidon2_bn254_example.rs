@@ -56,9 +56,9 @@ fn main() -> Result<()> {
     // fs::write("fibonacci_common_k.json" , common_circuit_data_serialized)       .expect("Unable to write file");
     // fs::write("fibonacci_vkey_k.json"   , verifier_only_circuit_data_serialized).expect("Unable to write file");
     // fs::write("fibonacci_proof_k.json"  , proof_serialized)                     .expect("Unable to write file");
-
     // println!("const sigma: {:?}", data.verifier_only.constants_sigmas_cap);
     // println!("circ digest: {:?}", data.verifier_only.circuit_digest);
+    // println!("proof part: {:?}", proof.proof.wires_cap.0);
 
     println!(
         "100th Fibonacci number mod |F| (starting with {}, {}) is: {}",
@@ -69,5 +69,4 @@ fn main() -> Result<()> {
         print_hash_statistics: HashStatisticsPrintLevel::Summary,
     };
     data.verify_with_options(proof, &verifier_opts)
-
 }

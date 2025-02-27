@@ -10,12 +10,66 @@ use crate::field::goldilocks_field::GoldilocksField;
 use crate::field::types::{Field, PrimeField64, Sample};
 use crate::hash::poseidon::Poseidon;
 use crate::iop::target::Target;
-use crate::plonk::config::GenericHashOut;
+use crate::plonk::config::{GenericField, GenericHashOut};
+use ark_bn254::Fr as BN254Fr;
+use crate::hash::poseidon2_bn254::{bytes_to_felts, felts_to_bytes};
 
 /// A prime order field with the features we need to use it as a base field in our argument system.
 pub trait RichField: PrimeField64 + Poseidon {}
 
 impl RichField for GoldilocksField {}
+
+/// Hash digest for the BN254 field, contains single Fr element
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub struct BN254HashOut{
+    pub element: BN254Fr
+}
+
+/// Serialize the bn254 field , uses Arkworks
+impl Serialize for BN254HashOut {
+    fn serialize < S > ( & self, serializer: S) -> Result < S::Ok, S::Error >
+        where S: Serializer {
+
+        let element_to_bytes = felts_to_bytes(&self.element);
+        serializer.serialize_bytes( & element_to_bytes)
+    }
+}
+/// Deserialize the bn254 field , uses Arkworks
+impl<'de> Deserialize<'de> for BN254HashOut {
+    fn deserialize<
+        D>(deserializer: D) -> Result< Self,
+        D::Error>
+        where D: Deserializer<'de> {
+        let element_as_bytes = < [u8; 32] >::deserialize(deserializer) ?;
+        let mut element_array = < [u8; 32] >::default();
+        element_array.copy_from_slice( & element_as_bytes[0..32]);
+
+        let deserialized_element = bytes_to_felts(&element_array);
+
+        Ok( Self {
+            element: deserialized_element,
+        })
+    }
+}
+
+/// implement GenericHashOut for the BN254 hash digest
+/// `F` here is the goldilocks not the BN254 field
+impl<F: RichField> GenericHashOut<F> for BN254HashOut {
+    fn to_bytes(&self) -> Vec<u8> {
+        felts_to_bytes(&self.element)
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Self {
+        assert_eq!(bytes.len(), 32);
+        BN254HashOut{
+            element: bytes_to_felts(bytes)
+        }
+    }
+
+    fn to_vec(&self) -> Vec<GenericField<F>> {
+        vec![GenericField::BN254(self.element.clone())]
+    }
+}
 
 pub const NUM_HASH_OUT_ELTS: usize = 4;
 
@@ -103,8 +157,12 @@ impl<F: RichField> GenericHashOut<F> for HashOut<F> {
         }
     }
 
-    fn to_vec(&self) -> Vec<F> {
-        self.elements.to_vec()
+    fn to_vec(&self) -> Vec<GenericField<F>> {
+        self.elements
+            .iter()
+            .copied()
+            .map(GenericField::<F>::Goldilocks)
+            .collect()
     }
 }
 
@@ -181,14 +239,15 @@ impl<F: RichField, const N: usize> GenericHashOut<F> for BytesHash<N> {
         Self(bytes.try_into().unwrap())
     }
 
-    fn to_vec(&self) -> Vec<F> {
+    fn to_vec(&self) -> Vec<GenericField<F>> {
         self.0
             // Chunks of 7 bytes since 8 bytes would allow collisions.
             .chunks(7)
             .map(|bytes| {
-                let mut arr = [0; 8];
+                let mut arr = [0u8; 8];
                 arr[..bytes.len()].copy_from_slice(bytes);
-                F::from_canonical_u64(u64::from_le_bytes(arr))
+                let raw = F::from_canonical_u64(u64::from_le_bytes(arr));
+                GenericField::<F>::Goldilocks(raw)
             })
             .collect()
     }

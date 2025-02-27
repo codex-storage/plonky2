@@ -7,7 +7,7 @@ use keccak_hash::keccak;
 
 use crate::hash::hash_types::{BytesHash, RichField};
 use crate::hash::hashing::PlonkyPermutation;
-use crate::plonk::config::Hasher;
+use crate::plonk::config::{GenericField, GenericHashOut, Hasher};
 use crate::util::serialization::Write;
 
 pub const SPONGE_RATE: usize = 8;
@@ -102,17 +102,74 @@ impl<F: RichField> PlonkyPermutation<F> for KeccakPermutation<F> {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct KeccakHash<const N: usize>;
 impl<F: RichField, const N: usize> Hasher<F> for KeccakHash<N> {
+    type HF = F;
     const HASH_SIZE: usize = N;
     type Hash = BytesHash<N>;
     type Permutation = KeccakPermutation<F>;
 
-    fn hash_no_pad(input: &[F]) -> Self::Hash {
+    fn hash_pad(input: &[GenericField<F>]) -> Self::Hash {
+        let mut padded_input = input.to_vec();
+        padded_input.push(GenericField::Goldilocks(F::ONE));
+        while (padded_input.len() + 1) % Self::Permutation::RATE != 0 {
+            padded_input.push(GenericField::Goldilocks(F::ZERO));
+        }
+        padded_input.push(GenericField::Goldilocks(F::ONE));
+        Self::hash_no_pad(&padded_input)
+    }
+
+    fn hash_or_noop(inputs: &[GenericField<F>]) -> Self::Hash {
+        let hash_size = 4 * 8;
+        if inputs.len() * 8 <= hash_size {
+            let mut inputs_bytes = vec![0u8; hash_size];
+            for i in 0..inputs.len() {
+                let goldilocks_felt = match inputs[i].clone() {
+                    GenericField::Goldilocks(v) => { v }
+                    GenericField::BN254(_) => {panic!("BN input is not supported for goldilocks hasher")}
+                };
+                inputs_bytes[i * 8..(i + 1) * 8]
+                    .copy_from_slice(&goldilocks_felt.to_canonical_u64().to_le_bytes());
+            }
+            <BytesHash::<N> as GenericHashOut<F>>::from_bytes(&inputs_bytes)
+        } else {
+            Self::hash_no_pad(inputs)
+        }
+    }
+
+    fn hash_no_pad(input: &[GenericField<F>]) -> Self::Hash {
         let mut buffer = Vec::with_capacity(input.len());
-        buffer.write_field_vec(input).unwrap();
+        let mut goldilocks_felts = vec![];
+        for e in input {
+            // only accept goldilocks (for now!)
+            match e {
+                GenericField::Goldilocks(v) => {goldilocks_felts.push(*v)}
+                GenericField::BN254(_) => {panic!("BN input is not supported for goldilocks hasher")}
+            }
+        }
+
+        buffer.write_field_vec(&goldilocks_felts).unwrap();
         let mut arr = [0; N];
         let hash_bytes = keccak(buffer).0;
         arr.copy_from_slice(&hash_bytes[..N]);
         BytesHash(arr)
+    }
+
+    fn sponge(state: &mut Self::Permutation, input: Vec<GenericField<F>>) {
+        let mut goldilocks_felts = vec![];
+        for e in input {
+            //only accept goldilocks (for now!)
+            match e {
+                GenericField::Goldilocks(v) => {goldilocks_felts.push(v)}
+                GenericField::BN254(_) => {panic!("BN input is not supported for goldilocks hasher")}
+            }
+        }
+        for chunk in goldilocks_felts.chunks(Self::Permutation::RATE) {
+            state.set_from_slice(chunk, 0);
+            state.permute();
+        }
+    }
+
+    fn squeeze_goldilocks(state: &mut Self::Permutation) -> Vec<F> {
+        state.squeeze().to_vec()
     }
 
     fn two_to_one(left: Self::Hash, right: Self::Hash) -> Self::Hash {

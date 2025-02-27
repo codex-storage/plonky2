@@ -10,7 +10,7 @@ use crate::hash::merkle_proofs::MerkleProof;
 use crate::hash::merkle_tree::{
     capacity_up_to_mut, fill_digests_buf, merkle_tree_prove, MerkleCap,
 };
-use crate::plonk::config::{GenericHashOut, Hasher};
+use crate::plonk::config::{GenericField, GenericHashOut, Hasher};
 use crate::util::log2_strict;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -56,9 +56,20 @@ impl<F: RichField, H: Hasher<F>> BatchMerkleTree<F, H> {
         let mut digests_buf_pos = 0;
 
         let mut cap = vec![];
-        let dummy_leaves = vec![vec![F::ZERO]; 1 << cap_height];
-        leaves.push(dummy_leaves);
-        for window in leaves.windows(2) {
+        let dummy_leaves_felts = vec![vec![GenericField::Goldilocks(F::ZERO)]; 1 << cap_height];
+        let mut leaves_felts: Vec<Vec<Vec<GenericField<F>>>> = leaves.clone().into_iter()
+            .map(|matrix| {
+                matrix.into_iter()
+                    .map(|vec| {
+                        vec.into_iter()
+                            .map(|f| GenericField::Goldilocks(f))
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect();
+        leaves_felts.push(dummy_leaves_felts);
+        for window in leaves_felts.windows(2) {
             let cur = &window[0];
             let next = &window[1];
 
@@ -82,7 +93,7 @@ impl<F: RichField, H: Hasher<F>> BatchMerkleTree<F, H> {
                 );
             } else {
                 // The rest leaf layers
-                let new_leaves: Vec<Vec<F>> = cap
+                let new_leaves: Vec<Vec<GenericField<F>>> = cap
                     .iter()
                     .enumerate()
                     .map(|(i, cap_hash)| {
@@ -118,8 +129,6 @@ impl<F: RichField, H: Hasher<F>> BatchMerkleTree<F, H> {
             digests.set_len(num_digests);
         }
 
-        // remove dummy leaves
-        leaves.pop();
 
         Self {
             leaves,

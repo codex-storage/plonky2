@@ -14,7 +14,7 @@ use crate::hash::hash_types::{RichField, NUM_HASH_OUT_ELTS};
 use crate::hash::hashing::*;
 use crate::hash::merkle_tree::MerkleTree;
 use crate::iop::challenger::Challenger;
-use crate::plonk::config::GenericConfig;
+use crate::plonk::config::{GenericConfig, GenericField};
 use crate::plonk::plonk_common::reduce_with_powers;
 use crate::plonk::prover::ProverOptions;
 use crate::plonk::verifier::HashStatisticsPrintLevel;
@@ -136,8 +136,9 @@ fn fri_committed_trees<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>,
     if let Some(step_count) = max_num_query_steps {
         let cap_len = (1 << fri_params.config.cap_height) * NUM_HASH_OUT_ELTS;
         let zero_cap = vec![F::ZERO; cap_len];
+        let zero_cap_felts: Vec<GenericField<F>> = zero_cap.into_iter().map(GenericField::Goldilocks).collect();
         for _ in fri_params.reduction_arity_bits.len()..step_count {
-            challenger.observe_elements(&zero_cap);
+            challenger.observe_elements(&zero_cap_felts);
             challenger.get_extension_challenge::<D>();
         }
     }
@@ -171,45 +172,12 @@ pub(crate) fn fri_proof_of_work<
 ) -> F {
     let min_leading_zeros = config.proof_of_work_bits + (64 - F::order().bits()) as u32;
 
-    // The easiest implementation would be repeatedly clone our Challenger. With each clone, we'd
-    // observe an incrementing PoW witness, then get the PoW response. If it contained sufficient
-    // leading zeros, we'd end the search, and store this clone as our new challenger.
-    //
-    // However, performance is critical here. We want to avoid cloning Challenger, particularly
-    // since it stores vectors, which means allocations. We'd like a more compact state to clone.
-    //
-    // We know that a duplex will be performed right after we send the PoW witness, so we can ignore
-    // any output_buffer, which will be invalidated. We also know
-    // input_buffer.len() < H::Permutation::WIDTH, an invariant of Challenger.
-    //
-    // We separate the duplex operation into two steps, one which can be performed now, and the
-    // other which depends on the PoW witness candidate. The first step is the overwrite our sponge
-    // state with any inputs (excluding the PoW witness candidate). The second step is to overwrite
-    // one more element of our sponge state with the candidate, then apply the permutation,
-    // obtaining our duplex's post-state which contains the PoW response.
-    let mut duplex_intermediate_state = challenger.sponge_state;
-    let witness_input_pos = challenger.input_buffer.len();
-    duplex_intermediate_state.set_from_iter(challenger.input_buffer.clone(), 0);
-
-    // println!("duplex_intermediate_state = {:?}", duplex_intermediate_state);
-
-    let pow_witness = (0..=F::NEG_ONE.to_canonical_u64())
-        .into_par_iter()
-        .find_any(|&candidate| {
-            let mut duplex_state = duplex_intermediate_state;
-            duplex_state.set_elt(F::from_canonical_u64(candidate), witness_input_pos);
-            duplex_state.permute();
-            let pow_response = duplex_state.squeeze().iter().last().unwrap();
-            let leading_zeros = pow_response.to_canonical_u64().leading_zeros();
-            leading_zeros >= min_leading_zeros
-        })
-        .map(F::from_canonical_u64)
-        .expect("Proof of work failed. This is highly unlikely!");
+    let pow_witness = challenger.grind(min_leading_zeros);
 
     // println!("pow_witness = {:?}",pow_witness);
 
     // Recompute pow_response using our normal Challenger code, and make sure it matches.
-    challenger.observe_element(pow_witness);
+    challenger.observe_element(GenericField::Goldilocks(pow_witness));
     let pow_response = challenger.get_challenge();
     let leading_zeros = pow_response.to_canonical_u64().leading_zeros();
     assert!(leading_zeros >= min_leading_zeros);

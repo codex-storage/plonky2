@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hash::hash_types::RichField;
 use crate::hash::merkle_proofs::MerkleProof;
-use crate::plonk::config::{GenericHashOut, Hasher};
+use crate::plonk::config::{GenericField, GenericHashOut, Hasher};
 use crate::util::log2_strict;
 
 /// The Merkle cap of height `h` of a Merkle tree is the `h`-th layer (from the root) of the tree.
@@ -37,7 +37,7 @@ impl<F: RichField, H: Hasher<F>> MerkleCap<F, H> {
         log2_strict(self.len())
     }
 
-    pub fn flatten(&self) -> Vec<F> {
+    pub fn flatten(&self) -> Vec<GenericField<F>> {
         self.0.iter().flat_map(|&h| h.to_vec()).collect()
     }
 }
@@ -85,7 +85,7 @@ pub(crate) fn capacity_up_to_mut<T>(v: &mut Vec<T>, len: usize) -> &mut [MaybeUn
 
 pub(crate) fn fill_subtree<F: RichField, H: Hasher<F>>(
     digests_buf: &mut [MaybeUninit<H::Hash>],
-    leaves: &[Vec<F>],
+    leaves: &[Vec<GenericField<F>>],
 ) -> H::Hash {
     assert_eq!(leaves.len(), digests_buf.len() / 2 + 1);
     if digests_buf.is_empty() {
@@ -115,7 +115,7 @@ pub(crate) fn fill_subtree<F: RichField, H: Hasher<F>>(
 pub(crate) fn fill_digests_buf<F: RichField, H: Hasher<F>>(
     digests_buf: &mut [MaybeUninit<H::Hash>],
     cap_buf: &mut [MaybeUninit<H::Hash>],
-    leaves: &[Vec<F>],
+    leaves: &[Vec<GenericField<F>>],
     cap_height: usize,
 ) {
     // Special case of a tree that's all cap. The usual case will panic because we'll try to split
@@ -207,8 +207,12 @@ impl<F: RichField, H: Hasher<F>> MerkleTree<F, H> {
 
         let digests_buf = capacity_up_to_mut(&mut digests, num_digests);
         let cap_buf = capacity_up_to_mut(&mut cap, len_cap);
-        fill_digests_buf::<F, H>(digests_buf, cap_buf, &leaves[..], cap_height);
-
+        let leaves_felts: Vec<Vec<GenericField<F>>> = leaves.clone().into_iter()
+            .map(|inner| {
+                inner.into_iter().map(|f| GenericField::Goldilocks(f)).collect()
+            })
+            .collect();
+        fill_digests_buf::<F, H>(digests_buf, cap_buf, &leaves_felts[..], cap_height);
         unsafe {
             // SAFETY: `fill_digests_buf` and `cap` initialized the spare capacity up to
             // `num_digests` and `len_cap`, resp.

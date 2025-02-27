@@ -44,7 +44,7 @@ use crate::plonk::circuit_data::{
     CircuitConfig, CircuitData, CommonCircuitData, MockCircuitData, ProverCircuitData,
     ProverOnlyCircuitData, VerifierCircuitData, VerifierCircuitTarget, VerifierOnlyCircuitData,
 };
-use crate::plonk::config::{AlgebraicHasher, GenericConfig, GenericHashOut, Hasher};
+use crate::plonk::config::{AlgebraicHasher, GenericConfig, GenericField, GenericHashOut, Hasher};
 use crate::plonk::copy_constraint::CopyConstraint;
 use crate::plonk::permutation_argument::Forest;
 use crate::plonk::plonk_common::PlonkOracle;
@@ -1256,13 +1256,14 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
         };
         let constants_sigmas_cap = constants_sigmas_commitment.merkle_tree.cap.clone();
         let domain_separator = self.domain_separator.unwrap_or_default();
-        let domain_separator_digest = C::Hasher::hash_pad(&domain_separator);
+        let ds_felts: Vec<GenericField<F>> = domain_separator.clone().into_iter().map(GenericField::Goldilocks).collect();
+        let domain_separator_digest = C::Hasher::hash_pad(&ds_felts);
         // TODO: This should also include an encoding of gate constraints.
         let circuit_digest_parts = [
             constants_sigmas_cap.flatten(),
             domain_separator_digest.to_vec(),
             vec![
-                F::from_canonical_usize(degree_bits),
+                GenericField::Goldilocks(F::from_canonical_usize(degree_bits)),
                 /* Add other circuit data here */
             ],
         ];
