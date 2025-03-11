@@ -107,7 +107,7 @@ impl<F: RichField, H: Hasher<F>> DuplexState<F,H> {
             .find_any(|&candidate| {
                 let mut duplex_state = state.clone();
                 let mut sponge_input = input.clone();
-                sponge_input.push(GenericField::Goldilocks(F::from_canonical_u64(candidate)));
+                sponge_input.push(F::from_canonical_u64(candidate).into());
                 H::sponge(&mut duplex_state, sponge_input);
                 let temp_buf = Self::squeeze_f(&mut duplex_state);
                 let pow_response = temp_buf.iter().last().unwrap();

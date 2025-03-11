@@ -13,7 +13,7 @@ use crate::hash::merkle_tree::MerkleCap;
 use crate::iop::target::{BoolTarget, Target};
 use crate::plonk::circuit_builder::CircuitBuilder;
 use crate::plonk::circuit_data::VerifierCircuitTarget;
-use crate::plonk::config::{AlgebraicHasher, GenericField, GenericHashOut, Hasher};
+use crate::plonk::config::{AlgebraicHasher, GenericField, GenericHashOut, Hasher, IntoGenericFieldVec};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(bound = "")]
@@ -79,7 +79,7 @@ pub fn verify_batch_merkle_proof_to_cap<F: RichField, H: Hasher<F>>(
     assert_eq!(leaf_data.len(), leaf_heights.len());
     let leaf_data_felts: Vec<Vec<GenericField<F>>> = leaf_data.into_iter()
         .map(|inner| {
-            inner.into_iter().map(|f| GenericField::Goldilocks(f.clone())).collect()
+            inner.clone().into_generic_field_vec()
         })
         .collect();
     let mut current_digest = H::hash_or_noop(&leaf_data_felts[0]);
@@ -102,7 +102,7 @@ pub fn verify_batch_merkle_proof_to_cap<F: RichField, H: Hasher<F>>(
             leaf_data_index += 1;
         }
     }
-    assert_eq!(leaf_data_index, leaf_data.len());
+    assert_eq!(leaf_data_index, leaf_data_felts.len());
     ensure!(
         current_digest == merkle_cap.0[leaf_index],
         "Invalid Merkle proof."

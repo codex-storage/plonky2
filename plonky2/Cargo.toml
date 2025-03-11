@@ -39,6 +39,7 @@ rust-bn254-hash = {git = "https://github.com/codex-storage/rust-bn254-hash.git"}
 ark-serialize = {version = "0.5.0"}
 ark-bn254 = "0.5.0"
 ark-ff = "0.5.0"
+num-bigint = { version = "0.4", default-features = false }
 
 # Local dependencies
 plonky2_field = { version = "1.0.0", path = "../field", default-features = false }
@@ -77,6 +78,10 @@ harness = false
 
 [[bench]]
 name = "hashing"
+harness = false
+
+[[bench]]
+name = "bn254_hash"
 harness = false
 
 [[bench]]

@@ -30,7 +30,7 @@ use crate::iop::target::Target;
 use crate::iop::witness::{MatrixWitness, PartialWitness, PartitionWitness, Witness, WitnessWrite};
 use crate::plonk::circuit_builder::NUM_COINS_LOOKUP;
 use crate::plonk::circuit_data::{CommonCircuitData, ProverOnlyCircuitData};
-use crate::plonk::config::{GenericConfig, GenericField, Hasher};
+use crate::plonk::config::{GenericConfig, GenericField, Hasher, IntoGenericFieldVec};
 use crate::plonk::plonk_common::PlonkOracle;
 use crate::plonk::proof::{OpeningSet, Proof, ProofWithPublicInputs};
 use crate::plonk::vanishing_poly::{eval_vanishing_poly_base_batch, get_lut_poly};
@@ -269,7 +269,7 @@ where
     set_lookup_wires(prover_data, common_data, &mut partition_witness)?;
 
     let public_inputs = partition_witness.get_targets(&prover_data.public_inputs);
-    let pi_felts: Vec<GenericField<F>> = public_inputs.clone().into_iter().map(GenericField::Goldilocks).collect();
+    let pi_felts: Vec<GenericField<F>> = public_inputs.clone().into_generic_field_vec();
     let public_inputs_hash = C::InnerHasher::hash_no_pad(&pi_felts);
 
     let witness = timed!(

@@ -14,7 +14,7 @@ use crate::hash::hash_types::{RichField, NUM_HASH_OUT_ELTS};
 use crate::hash::hashing::*;
 use crate::hash::merkle_tree::MerkleTree;
 use crate::iop::challenger::Challenger;
-use crate::plonk::config::{GenericConfig, GenericField};
+use crate::plonk::config::{GenericConfig, GenericField, IntoGenericFieldVec};
 use crate::plonk::plonk_common::reduce_with_powers;
 use crate::plonk::prover::ProverOptions;
 use crate::plonk::verifier::HashStatisticsPrintLevel;
@@ -136,7 +136,7 @@ fn fri_committed_trees<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>,
     if let Some(step_count) = max_num_query_steps {
         let cap_len = (1 << fri_params.config.cap_height) * NUM_HASH_OUT_ELTS;
         let zero_cap = vec![F::ZERO; cap_len];
-        let zero_cap_felts: Vec<GenericField<F>> = zero_cap.into_iter().map(GenericField::Goldilocks).collect();
+        let zero_cap_felts: Vec<GenericField<F>> = zero_cap.into_generic_field_vec();
         for _ in fri_params.reduction_arity_bits.len()..step_count {
             challenger.observe_elements(&zero_cap_felts);
             challenger.get_extension_challenge::<D>();
@@ -177,7 +177,7 @@ pub(crate) fn fri_proof_of_work<
     // println!("pow_witness = {:?}",pow_witness);
 
     // Recompute pow_response using our normal Challenger code, and make sure it matches.
-    challenger.observe_element(GenericField::Goldilocks(pow_witness));
+    challenger.observe_element(pow_witness.into());
     let pow_response = challenger.get_challenge();
     let leading_zeros = pow_response.to_canonical_u64().leading_zeros();
     assert!(leading_zeros >= min_leading_zeros);

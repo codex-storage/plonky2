@@ -43,7 +43,7 @@ impl<F: RichField, H: Hasher<F>> Challenger<F, H>
         where
             F: RichField + Extendable<D>,
     {
-        let elements = element.to_basefield_array().map(|e: F|GenericField::<F>::Goldilocks(e));
+        let elements = element.to_basefield_array().map(|e: F|e.into());
 
         self.observe_elements(&elements);
     }
@@ -268,7 +268,7 @@ mod tests {
     use crate::iop::witness::{PartialWitness, Witness};
     use crate::plonk::circuit_builder::CircuitBuilder;
     use crate::plonk::circuit_data::CircuitConfig;
-    use crate::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use crate::plonk::config::{GenericConfig, GenericField, IntoGenericFieldVec, PoseidonGoldilocksConfig};
 
     #[test]
     fn no_duplicate_challenges() {
@@ -280,7 +280,7 @@ mod tests {
 
         for i in 1..10 {
             challenges.extend(challenger.get_n_challenges(i));
-            challenger.observe_element(F::rand());
+            challenger.observe_element(F::rand().into());
         }
 
         let dedup_challenges = {
@@ -304,9 +304,13 @@ mod tests {
         let num_outputs_per_round = [1, 2, 4];
 
         // Generate random input messages.
-        let inputs_per_round: Vec<Vec<F>> = num_inputs_per_round
+        let inputs_per_round_f: Vec<Vec<F>> = num_inputs_per_round
             .iter()
             .map(|&n| F::rand_vec(n))
+            .collect();
+        let inputs_per_round: Vec<Vec<GenericField<F>>> = inputs_per_round_f
+            .iter()
+            .map(|n| n.clone().into_generic_field_vec())
             .collect();
 
         let mut challenger = Challenger::<F, <C as GenericConfig<D>>::InnerHasher>::new();
@@ -321,7 +325,7 @@ mod tests {
         let mut recursive_challenger =
             RecursiveChallenger::<F, <C as GenericConfig<D>>::InnerHasher, D>::new(&mut builder);
         let mut recursive_outputs_per_round: Vec<Vec<Target>> = Vec::new();
-        for (r, inputs) in inputs_per_round.iter().enumerate() {
+        for (r, inputs) in inputs_per_round_f.iter().enumerate() {
             recursive_challenger.observe_elements(&builder.constants(inputs));
             recursive_outputs_per_round.push(
                 recursive_challenger.get_n_challenges(&mut builder, num_outputs_per_round[r]),

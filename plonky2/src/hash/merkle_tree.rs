@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::hash::hash_types::RichField;
 use crate::hash::merkle_proofs::MerkleProof;
-use crate::plonk::config::{GenericField, GenericHashOut, Hasher};
+use crate::plonk::config::{GenericField, GenericHashOut, Hasher, IntoGenericFieldVec};
 use crate::util::log2_strict;
 
 /// The Merkle cap of height `h` of a Merkle tree is the `h`-th layer (from the root) of the tree.
@@ -209,7 +209,7 @@ impl<F: RichField, H: Hasher<F>> MerkleTree<F, H> {
         let cap_buf = capacity_up_to_mut(&mut cap, len_cap);
         let leaves_felts: Vec<Vec<GenericField<F>>> = leaves.clone().into_iter()
             .map(|inner| {
-                inner.into_iter().map(|f| GenericField::Goldilocks(f)).collect()
+                inner.into_generic_field_vec()
             })
             .collect();
         fill_digests_buf::<F, H>(digests_buf, cap_buf, &leaves_felts[..], cap_height);

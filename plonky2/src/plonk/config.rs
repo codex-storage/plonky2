@@ -24,7 +24,7 @@ use crate::iop::target::{BoolTarget, Target};
 use crate::plonk::circuit_builder::CircuitBuilder;
 use ark_bn254::Fr as BN254Fr;
 use ark_ff::{One, Zero};
-use crate::hash::poseidon2_bn254::{bytes_to_felts, felts_to_bytes, Poseidon2BN254};
+use crate::hash::poseidon2_bn254::{bytes_le_to_felts, felts_to_bytes_le, Poseidon2BN254};
 
 pub trait GenericHashOut<F: RichField>:
 Copy + Clone + Debug + Eq + PartialEq + Send + Sync + Serialize + DeserializeOwned
@@ -43,13 +43,44 @@ pub enum GenericField<F: RichField> {
     BN254(BN254Fr),
 }
 
+// Convert a Goldilocks field element into a GenericField.
+impl<F: RichField> From<F> for GenericField<F> {
+    fn from(x: F) -> Self {
+        GenericField::Goldilocks(x)
+    }
+}
+
+// Convert a BN254Fr element into a GenericField.
+impl<F: RichField> From<BN254Fr> for GenericField<F> {
+    fn from(x: BN254Fr) -> Self {
+        GenericField::BN254(x)
+    }
+}
+
+/// Extension trait to convert vectors of F or BN254Fr to Vec<GenericField<F>>.
+pub trait IntoGenericFieldVec<F: RichField> {
+    fn into_generic_field_vec(self) -> Vec<GenericField<F>>;
+}
+
+impl<F: RichField> IntoGenericFieldVec<F> for Vec<F> {
+    fn into_generic_field_vec(self) -> Vec<GenericField<F>> {
+        self.into_iter().map(GenericField::from).collect()
+    }
+}
+
+impl<F: RichField> IntoGenericFieldVec<F> for Vec<BN254Fr> {
+    fn into_generic_field_vec(self) -> Vec<GenericField<F>> {
+        self.into_iter().map(GenericField::from).collect()
+    }
+}
+
 /// hasher field trait to cover fields in `GenericField` enum
 pub trait HasherField: Default + Sized + Copy + Debug + Eq + PartialEq + Sync + Send {
     fn get_one() -> Self;
     fn get_zero() -> Self;
-    fn to_bytes(&self) -> Vec<u8>;
+    fn to_bytes_le(&self) -> Vec<u8>;
 
-    fn from_bytes(b: &[u8]) -> Self;
+    fn from_bytes_le(b: &[u8]) -> Self;
 
 }
 
@@ -63,12 +94,12 @@ impl HasherField for BN254Fr {
         BN254Fr::zero()
     }
 
-    fn to_bytes(&self) -> Vec<u8> {
-        felts_to_bytes::<BN254Fr>(&self)
+    fn to_bytes_le(&self) -> Vec<u8> {
+        felts_to_bytes_le::<BN254Fr>(&self)
     }
 
-    fn from_bytes(b: &[u8]) -> Self {
-        bytes_to_felts::<BN254Fr>(b)
+    fn from_bytes_le(b: &[u8]) -> Self {
+        bytes_le_to_felts::<BN254Fr>(b)
     }
 }
 
@@ -82,11 +113,11 @@ impl <T: RichField> HasherField for T {
         T::ZERO
     }
 
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes_le(&self) -> Vec<u8> {
         self.to_canonical_u64().to_le_bytes().to_vec()
     }
 
-    fn from_bytes(b: &[u8]) -> Self {
+    fn from_bytes_le(b: &[u8]) -> Self {
         assert_eq!(b.len(), 8, "Input vector must have exactly 8 bytes");
         let arr: [u8; 8] = b.try_into().expect("Conversion to array failed");
         let element = u64::from_le_bytes(arr);
@@ -180,7 +211,7 @@ impl GenericConfig<2> for KeccakGoldilocksConfig {
 }
 
 /// Configuration using Poseidon2BN254 as hasher over the Goldilocks field.
-#[derive(Debug, Copy, Clone, Default, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
 pub struct Poseidon2BN254Config;
 impl GenericConfig<2> for Poseidon2BN254Config {
     type F = GoldilocksField;

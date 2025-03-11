@@ -12,7 +12,7 @@ use crate::hash::poseidon::Poseidon;
 use crate::iop::target::Target;
 use crate::plonk::config::{GenericField, GenericHashOut};
 use ark_bn254::Fr as BN254Fr;
-use crate::hash::poseidon2_bn254::{bytes_to_felts, felts_to_bytes};
+use crate::hash::poseidon2_bn254::{bytes_le_to_felts, felts_to_bytes_le};
 
 /// A prime order field with the features we need to use it as a base field in our argument system.
 pub trait RichField: PrimeField64 + Poseidon {}
@@ -30,7 +30,7 @@ impl Serialize for BN254HashOut {
     fn serialize < S > ( & self, serializer: S) -> Result < S::Ok, S::Error >
         where S: Serializer {
 
-        let element_to_bytes = felts_to_bytes(&self.element);
+        let element_to_bytes = felts_to_bytes_le(&self.element);
         serializer.serialize_bytes( & element_to_bytes)
     }
 }
@@ -44,7 +44,7 @@ impl<'de> Deserialize<'de> for BN254HashOut {
         let mut element_array = < [u8; 32] >::default();
         element_array.copy_from_slice( & element_as_bytes[0..32]);
 
-        let deserialized_element = bytes_to_felts(&element_array);
+        let deserialized_element = bytes_le_to_felts(&element_array);
 
         Ok( Self {
             element: deserialized_element,
@@ -56,18 +56,18 @@ impl<'de> Deserialize<'de> for BN254HashOut {
 /// `F` here is the goldilocks not the BN254 field
 impl<F: RichField> GenericHashOut<F> for BN254HashOut {
     fn to_bytes(&self) -> Vec<u8> {
-        felts_to_bytes(&self.element)
+        felts_to_bytes_le(&self.element)
     }
 
     fn from_bytes(bytes: &[u8]) -> Self {
         assert_eq!(bytes.len(), 32);
         BN254HashOut{
-            element: bytes_to_felts(bytes)
+            element: bytes_le_to_felts(bytes)
         }
     }
 
     fn to_vec(&self) -> Vec<GenericField<F>> {
-        vec![GenericField::BN254(self.element.clone())]
+        vec![self.element.clone().into()]
     }
 }
 
@@ -163,6 +163,7 @@ impl<F: RichField> GenericHashOut<F> for HashOut<F> {
             .copied()
             .map(GenericField::<F>::Goldilocks)
             .collect()
+
     }
 }
 
@@ -247,7 +248,7 @@ impl<F: RichField, const N: usize> GenericHashOut<F> for BytesHash<N> {
                 let mut arr = [0u8; 8];
                 arr[..bytes.len()].copy_from_slice(bytes);
                 let raw = F::from_canonical_u64(u64::from_le_bytes(arr));
-                GenericField::<F>::Goldilocks(raw)
+                raw.into()
             })
             .collect()
     }

@@ -6,7 +6,7 @@ use num::Integer;
 
 use crate::hash::hash_types::RichField;
 use crate::hash::merkle_proofs::MerkleProof;
-use crate::plonk::config::{GenericField, Hasher};
+use crate::plonk::config::{GenericField, Hasher, IntoGenericFieldVec};
 
 /// Compress multiple Merkle proofs on the same tree by removing redundancy in the Merkle paths.
 pub(crate) fn compress_merkle_proofs<F: RichField, H: Hasher<F>>(
@@ -68,7 +68,7 @@ pub(crate) fn decompress_merkle_proofs<F: RichField, H: Hasher<F>>(
 
     for (&i, v) in leaves_indices.iter().zip(leaves_data) {
         // Observe the leaves.
-        let v_felts: Vec<GenericField<F>> = v.clone().into_iter().map(GenericField::Goldilocks).collect();
+        let v_felts: Vec<GenericField<F>> = v.clone().into_generic_field_vec();
         seen.insert(i + num_leaves, H::hash_or_noop(&v_felts));
     }
 

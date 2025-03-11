@@ -10,9 +10,14 @@ use rust_bn254_hash::state::State;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_bn254::{Fr as BN254Fr};
 use rust_bn254_hash::poseidon2::permutation::permute_inplace as permute_bn254_inplace;
-use ark_ff::{BigInt, PrimeField, Zero};
+use ark_ff::{ PrimeField, Zero,};
+use num::Integer;
+use num_bigint::BigUint;
+use ark_ff::BigInt as arkBigInt;
 use rust_bn254_hash::hash::Hash;
 use rust_bn254_hash::sponge::{sponge_felts_no_pad, sponge_felts_pad};
+use plonky2_field::goldilocks_field::GoldilocksField;
+use plonky2_field::types::Field64;
 
 pub const SPONGE_RATE: usize = 2;
 pub const SPONGE_CAPACITY: usize = 1;
@@ -84,8 +89,6 @@ impl PlonkyPermutation<BN254Fr> for Poseidon2BN254Perm {
 
 }
 
-
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Poseidon2BN254;
 impl<F: RichField> Hasher<F> for Poseidon2BN254 {
@@ -152,15 +155,45 @@ impl<F: RichField> Hasher<F> for Poseidon2BN254 {
     }
 
     fn squeeze_goldilocks(state: &mut Self::Permutation) -> Vec<F> {
+        // Squeeze out BN254 elements from the sponge state.
         let bn_out = state.squeeze();
-        let bn_bytes: Vec<u8> = bn_out.iter().flat_map(|e| felts_to_bytes(e)).collect();
-        let goldilocks_felts: Vec<F> = bytes_to_u64(&bn_bytes).iter().map(|e| F::from_canonical_u64(*e)).collect();
-        assert!(goldilocks_felts.len()>0);
-        goldilocks_felts
+
+        // convert bn to goldilocks
+        bn_to_goldilocks(bn_out)
     }
 }
 
 // --------- Conversion helper functions ---------------------
+
+/// Converts a slice of BN254 field elements to a vector of Goldilocks (F)
+fn bn_to_goldilocks<F: RichField>(input: &[BN254Fr]) -> Vec<F> {
+    // Goldilocks order
+    let r: BigUint = BigUint::from(GoldilocksField::ORDER);
+
+    let mut goldilocks_felts = Vec::new();
+    // For each BN254 field element, extract 3 Goldilocks elements.
+    for fe in input.into_iter().cloned() {
+        // Convert BN254Fr -> 256-bit big integer.
+        let mut big: BigUint = fe.into_bigint().into();
+
+        // We want three remainders in [0, p_Goldilocks), each fits into a 64-bit integer.
+        for _ in 0..3 {
+
+            let (quotient, remainder) = big.div_rem(&r);
+            let rem_u64 = remainder.to_u64_digits();
+
+            // check just for safety:
+            assert_eq!(rem_u64.len(), 1, "Remainder unexpectedly larger than 64 bits.");
+
+            let r64 = rem_u64[0];
+            goldilocks_felts.push(F::from_canonical_u64(r64));
+
+            // Update big to the quotient for the next remainder.
+            big = quotient;
+        }
+    }
+    goldilocks_felts
+}
 
 /// converts a vec of goldilocks to bn254
 /// takes 7 goldilocks and converts to 2 bn254
@@ -184,20 +217,15 @@ fn goldilocks_to_bn<F: RichField>(input: &Vec<F>) -> Vec<BN254Fr>{
             ws[i] = u64s[7 * m + i];
         }
         let (a, b) = u64s_to_felts(ws);
-        // check that we don't push zero field elements
-        if a != BN254Fr::zero() {
-            result.push(a);
-        }
-        if b != BN254Fr::zero() {
-            result.push(b);
-        }
+        result.push(a);
+        result.push(b);
     }
     result
 }
 
-const BIGINT_TWO_TO_64:  BigInt<4> = BigInt( [0,1,0,0] );
-const BIGINT_TWO_TO_128: BigInt<4> = BigInt( [0,0,1,0] );
-const BIGINT_TWO_TO_192: BigInt<4> = BigInt( [0,0,0,1] );
+const BIGINT_TWO_TO_64:  arkBigInt<4> = arkBigInt( [0,1,0,0] );
+const BIGINT_TWO_TO_128: arkBigInt<4> = arkBigInt( [0,0,1,0] );
+const BIGINT_TWO_TO_192: arkBigInt<4> = arkBigInt( [0,0,0,1] );
 
 /// converts u64 to BN254 - taken directly from: rust-bn254-hash
 pub fn u64s_to_felts(ws: [u64; 7]) -> (BN254Fr, BN254Fr) {
@@ -222,38 +250,6 @@ pub fn u64s_to_felts(ws: [u64; 7]) -> (BN254Fr, BN254Fr) {
         + field_powers_of_two_to_64[2] * BN254Fr::from(hi);
 
     (x, y)
-}
-
-/// converts a slice of bytes to 64 by taking 63 bits at a time
-/// this makes it safe for conversion from bytes to Goldilocks field elems
-/// this fn ignores any remaining bit that are less than 63 bits at the end
-pub fn bytes_to_u64(x: &[u8]) -> Vec<u64> {
-    let total_bits = x.len() * 8;
-    let num_chunks = total_bits / 63; // ignore any leftover bits
-    let mut result = Vec::with_capacity(num_chunks);
-
-    for i in 0..num_chunks {
-        let bit_offset = i * 63;
-        let first_byte = bit_offset / 8;
-        let shift = bit_offset % 8;
-        // how many bits do we need? We need (shift + 63) bits in total.
-        // convert that to bytes by rounding up.
-        let needed_bytes = ((shift + 63) + 7) / 8;
-
-        if first_byte + needed_bytes > x.len() {
-            break; // break out if incomplete chunk
-        }
-
-        let mut chunk: u128 = 0;
-        for j in 0..needed_bytes {
-            chunk |= (x[first_byte + j] as u128) << (8 * j);
-        }
-        // shift right with `shift` bits, then mask 63 bits.
-        let value = (chunk >> shift) & ((1u128 << 63) - 1);
-        result.push(value as u64);
-    }
-
-    result
 }
 
 /// helper function: converts a slice of GenericField<F> into a Vec<BN254Fr>
@@ -302,7 +298,7 @@ fn check_len_in_bytes<F: RichField>(input: &[GenericField<F>]) -> usize{
 
 //------------------ serialization for BN254 ---------------------
 
-pub fn felts_to_bytes<E>(f: &E) -> Vec<u8> where
+pub fn felts_to_bytes_le<E>(f: &E) -> Vec<u8> where
     E: CanonicalSerialize
 {
     let mut bytes = Vec::new();
@@ -310,7 +306,7 @@ pub fn felts_to_bytes<E>(f: &E) -> Vec<u8> where
     bytes
 }
 
-pub fn bytes_to_felts<E>(bytes: &[u8]) -> E where
+pub fn bytes_le_to_felts<E>(bytes: &[u8]) -> E where
     E: CanonicalDeserialize
 {
     let fr_res = E::deserialize_uncompressed(bytes).unwrap();
@@ -329,3 +325,41 @@ pub fn felts_to_u64<E>(f: E) -> Vec<u64>
         .map(|chunk| u64::from_le_bytes(chunk.try_into().unwrap()))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ark_bn254::Fr as BN254Fr;
+    use ark_ff::{One, Zero};
+
+    /// Test that converting a bn254 element to bytes and back.
+    #[test]
+    fn test_felts_bytes_roundtrip() {
+        let element = <BN254Fr as PrimeField>::from_bigint(arkBigInt::from(987654321u64)).unwrap();
+        let bytes = felts_to_bytes_le(&element);
+        assert_eq!(bytes.len(), 32, "Expected 32 bytes for BN254Fr serialization");
+        let recovered: BN254Fr = bytes_le_to_felts(&bytes);
+        assert_eq!(element, recovered, "Roundtrip conversion did not recover the original element");
+    }
+
+    /// Test roundtrip with edge cases: zero and one.
+    #[test]
+    fn test_zero_and_one_byte_conversion() {
+        let zero = BN254Fr::zero();
+        let one = BN254Fr::one();
+
+        let zero_bytes = felts_to_bytes_le(&zero);
+        let one_bytes = felts_to_bytes_le(&one);
+
+        // Check that both serializations are 32 bytes.
+        assert_eq!(zero_bytes.len(), 32, "Zero should serialize to 32 bytes");
+        assert_eq!(one_bytes.len(), 32, "One should serialize to 32 bytes");
+
+        let zero_back: BN254Fr = bytes_le_to_felts(&zero_bytes);
+        let one_back: BN254Fr = bytes_le_to_felts(&one_bytes);
+
+        assert_eq!(zero, zero_back, "Zero did not roundtrip correctly");
+        assert_eq!(one, one_back, "One did not roundtrip correctly");
+    }
+}
+

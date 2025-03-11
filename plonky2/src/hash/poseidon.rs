@@ -894,11 +894,11 @@ impl<F: RichField> Hasher<F> for PoseidonHash {
 
     fn hash_pad(input: &[GenericField<F>]) -> Self::Hash {
         let mut padded_input = input.to_vec();
-            padded_input.push(GenericField::Goldilocks(F::ONE));
+            padded_input.push(F::ONE.into());
             while (padded_input.len() + 1) % Self::Permutation::RATE != 0 {
-                padded_input.push(GenericField::Goldilocks(F::ZERO));
+                padded_input.push(F::ZERO.into());
             }
-            padded_input.push(GenericField::Goldilocks(F::ONE));
+            padded_input.push(F::ONE.into());
             Self::hash_no_pad(&padded_input)
     }
 
