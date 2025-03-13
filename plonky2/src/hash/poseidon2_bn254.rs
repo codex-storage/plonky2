@@ -165,7 +165,18 @@ impl<F: RichField> Hasher<F> for Poseidon2BN254 {
 
 // --------- Conversion helper functions ---------------------
 
-/// Converts a slice of BN254 field elements to a vector of Goldilocks (F)
+/// Converts a slice of BN254 field elements to a vector of Goldilocks (F) by:
+///
+///  - Interpreting each BN254 element as an unsigned big integer `BigUint`.
+///  - Repeatedly taking `remainder = X mod Goldilocks::ORDER` (which fits in a `u64`)
+///    and then dividing `X` by `Goldilocks::ORDER`.
+///  - Repeat this exactly 3 times for each BN254 element in the slice, generating 3*l Goldilocks elements
+///    where l = length of the slice.
+///
+/// We use this primarily in hashing contexts (for Fiat-Shamir in Plonky2 circuits), where
+/// we want to safely convert a ~254-bit BN254 element into multiple 64-bit
+/// Goldilocks elements. The little leftover in `X` after extracting 3 remainders
+/// is trashed, so there is a negligible bias.
 fn bn_to_goldilocks<F: RichField>(input: &[BN254Fr]) -> Vec<F> {
     // Goldilocks order
     let r: BigUint = BigUint::from(GoldilocksField::ORDER);
@@ -183,10 +194,12 @@ fn bn_to_goldilocks<F: RichField>(input: &[BN254Fr]) -> Vec<F> {
             let rem_u64 = remainder.to_u64_digits();
 
             // check just for safety:
-            assert_eq!(rem_u64.len(), 1, "Remainder unexpectedly larger than 64 bits.");
-
-            let r64 = rem_u64[0];
-            goldilocks_felts.push(F::from_canonical_u64(r64));
+            if rem_u64.len() > 1 {
+                panic!("Remainder unexpectedly larger than 64 bits.")
+            } else if rem_u64.len() == 1{
+                let r64 = rem_u64[0];
+                goldilocks_felts.push(F::from_canonical_u64(r64));
+            }
 
             // Update big to the quotient for the next remainder.
             big = quotient;
@@ -195,8 +208,15 @@ fn bn_to_goldilocks<F: RichField>(input: &[BN254Fr]) -> Vec<F> {
     goldilocks_felts
 }
 
-/// converts a vec of goldilocks to bn254
-/// takes 7 goldilocks and converts to 2 bn254
+
+/// Convert a vec of Goldilocks elements into BN254 elements.
+/// - pack `7` consecutive `u64` values into `2` BN254 field elements.
+/// - If the total number of Goldilocks elements is not a multiple of 7, we
+///   zero‐pad the last chunk up to 7. That chunk still produces 2 BN254 field elements.
+/// - Returns: A `Vec<BN254Fr>`
+///
+/// **Note**: This is used for packing a sequence of 64-bit words into
+/// BN254 in a safe way. It is NOT the inverse of `bn_to_goldilocks`
 fn goldilocks_to_bn<F: RichField>(input: &Vec<F>) -> Vec<BN254Fr>{
     let u64s: Vec<u64> = input.iter().map(|x| x.to_canonical_u64()).collect();
     let l = u64s.len();
@@ -331,6 +351,8 @@ mod tests {
     use super::*;
     use ark_bn254::Fr as BN254Fr;
     use ark_ff::{One, Zero};
+    use ark_std::{test_rng, UniformRand};
+    use plonky2_field::types::Field;
 
     /// Test that converting a bn254 element to bytes and back.
     #[test]
@@ -360,6 +382,50 @@ mod tests {
 
         assert_eq!(zero, zero_back, "Zero did not roundtrip correctly");
         assert_eq!(one, one_back, "One did not roundtrip correctly");
+    }
+
+    /// Test that bn_to_goldilocks produces exactly 3 Goldilocks per BN254.
+    #[test]
+    fn test_bn_to_goldilocks_three_remainders() {
+        // We'll test random BN254 elements to ensure no overflow panic.
+        let num_tests = 1000;
+        let mut bn_vec = Vec::with_capacity(num_tests);
+        for _ in 0..num_tests {
+            // A random BN254 field element
+            let fe = BN254Fr::rand(&mut test_rng());
+            bn_vec.push(fe);
+        }
+
+        let goldi_vec = bn_to_goldilocks::<GoldilocksField>(&bn_vec);
+        // Should be exactly 3 * num_tests
+        assert_eq!(goldi_vec.len(), 3 * num_tests);
+    }
+
+    /// Test that exactly 7 Goldilocks produce 2 BN254, and leftover is padded for partial groups.
+    #[test]
+    fn test_goldilocks_to_bn_packing() {
+        // 7 exact Goldilocks => 2 BN254
+        let goldis7 = vec![
+            GoldilocksField::from_canonical_u64(1),
+            GoldilocksField::from_canonical_u64(2),
+            GoldilocksField::from_canonical_u64(3),
+            GoldilocksField::from_canonical_u64(4),
+            GoldilocksField::from_canonical_u64(5),
+            GoldilocksField::from_canonical_u64(6),
+            GoldilocksField::from_canonical_u64(7),
+        ];
+        let bn_out = goldilocks_to_bn(&goldis7);
+        assert_eq!(bn_out.len(), 2, "7 Goldilocks should map to 2 BN254 elements");
+
+        // Now test leftover: 8 Goldilocks => we expect 2 BN254 from the first 7, plus
+        // 2 more BN254 for the leftover 1 (padded to 7). So total 4 BN254 elements.
+        let goldis8 = {
+            let mut v = goldis7.clone();
+            v.push(GoldilocksField::from_canonical_u64(123));
+            v
+        };
+        let bn_out_8 = goldilocks_to_bn(&goldis8);
+        assert_eq!(bn_out_8.len(), 4, "8 Goldilocks -> 4 BN254");
     }
 }
 
