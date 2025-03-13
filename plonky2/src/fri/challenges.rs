@@ -13,7 +13,7 @@ use crate::hash::merkle_tree::MerkleCap;
 use crate::iop::challenger::{Challenger, RecursiveChallenger};
 use crate::iop::target::Target;
 use crate::plonk::circuit_builder::CircuitBuilder;
-use crate::plonk::config::{AlgebraicHasher, GenericConfig, Hasher};
+use crate::plonk::config::{AlgebraicHasher, GenericConfig, GenericField, Hasher, IntoGenericFieldVec};
 
 impl<F: RichField, H: Hasher<F>> Challenger<F, H> {
     pub fn observe_openings<const D: usize>(&mut self, openings: &FriOpenings<F, D>)
@@ -57,8 +57,10 @@ impl<F: RichField, H: Hasher<F>> Challenger<F, H> {
         if let Some(step_count) = max_num_query_steps {
             let cap_len = (1 << config.cap_height) * NUM_HASH_OUT_ELTS;
             let zero_cap = vec![F::ZERO; cap_len];
+            let zero_cap_felts: Vec<GenericField<F>> = zero_cap.into_generic_field_vec();
             for _ in commit_phase_merkle_caps.len()..step_count {
-                self.observe_elements(&zero_cap);
+                // self.observe_elements(&zero_cap);
+                self.observe_elements(&zero_cap_felts);
                 self.get_extension_challenge::<D>();
             }
         }
@@ -73,7 +75,7 @@ impl<F: RichField, H: Hasher<F>> Challenger<F, H> {
             }
         }
 
-        self.observe_element(pow_witness);
+        self.observe_element(pow_witness.into());
         let fri_pow_response = self.get_challenge();
 
         let fri_query_indices = (0..num_fri_queries)

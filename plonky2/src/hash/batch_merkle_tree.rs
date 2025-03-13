@@ -10,7 +10,7 @@ use crate::hash::merkle_proofs::MerkleProof;
 use crate::hash::merkle_tree::{
     capacity_up_to_mut, fill_digests_buf, merkle_tree_prove, MerkleCap,
 };
-use crate::plonk::config::{GenericHashOut, Hasher};
+use crate::plonk::config::{GenericField, GenericHashOut, Hasher, IntoGenericFieldVec};
 use crate::util::log2_strict;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -56,9 +56,18 @@ impl<F: RichField, H: Hasher<F>> BatchMerkleTree<F, H> {
         let mut digests_buf_pos = 0;
 
         let mut cap = vec![];
-        let dummy_leaves = vec![vec![F::ZERO]; 1 << cap_height];
-        leaves.push(dummy_leaves);
-        for window in leaves.windows(2) {
+        let dummy_leaves_felts = vec![vec![F::ZERO.into()]; 1 << cap_height];
+        let mut leaves_felts: Vec<Vec<Vec<GenericField<F>>>> = leaves.clone().into_iter()
+            .map(|matrix| {
+                matrix.into_iter()
+                    .map(|vec| {
+                        vec.into_generic_field_vec()
+                    })
+                    .collect()
+            })
+            .collect();
+        leaves_felts.push(dummy_leaves_felts);
+        for window in leaves_felts.windows(2) {
             let cur = &window[0];
             let next = &window[1];
 
@@ -82,7 +91,7 @@ impl<F: RichField, H: Hasher<F>> BatchMerkleTree<F, H> {
                 );
             } else {
                 // The rest leaf layers
-                let new_leaves: Vec<Vec<F>> = cap
+                let new_leaves: Vec<Vec<GenericField<F>>> = cap
                     .iter()
                     .enumerate()
                     .map(|(i, cap_hash)| {
@@ -118,8 +127,6 @@ impl<F: RichField, H: Hasher<F>> BatchMerkleTree<F, H> {
             digests.set_len(num_digests);
         }
 
-        // remove dummy leaves
-        leaves.pop();
 
         Self {
             leaves,
@@ -175,7 +182,7 @@ mod tests {
 
     use super::*;
     use crate::hash::merkle_proofs::verify_batch_merkle_proof_to_cap;
-    use crate::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+    use crate::plonk::config::{GenericConfig, IntoGenericFieldVec, PoseidonGoldilocksConfig};
 
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
@@ -199,10 +206,10 @@ mod tests {
         let fmt: BatchMerkleTree<GoldilocksField, H> = BatchMerkleTree::new(vec![mat_1], 0);
 
         let mat_1_leaf_hashes = [
-            H::hash_or_noop(&[F::ZERO, F::ONE]),
-            H::hash_or_noop(&[F::TWO, F::ONE]),
-            H::hash_or_noop(&[F::TWO, F::TWO]),
-            H::hash_or_noop(&[F::ZERO, F::ZERO]),
+            H::hash_or_noop(&[F::ZERO.into(), F::ONE.into()]),
+            H::hash_or_noop(&[F::TWO.into(), F::ONE.into()]),
+            H::hash_or_noop(&[F::TWO.into(), F::TWO.into()]),
+            H::hash_or_noop(&[F::ZERO.into(), F::ZERO.into()]),
         ];
         assert_eq!(mat_1_leaf_hashes[0..2], fmt.digests[0..2]);
         assert_eq!(mat_1_leaf_hashes[2..4], fmt.digests[4..6]);
@@ -251,10 +258,10 @@ mod tests {
             BatchMerkleTree::new(vec![mat_1, mat_2.clone()], 0);
 
         let mat_1_leaf_hashes = [
-            H::hash_or_noop(&[F::ZERO, F::ONE]),
-            H::hash_or_noop(&[F::TWO, F::ONE]),
-            H::hash_or_noop(&[F::TWO, F::TWO]),
-            H::hash_or_noop(&[F::ZERO, F::ZERO]),
+            H::hash_or_noop(&[F::ZERO.into(), F::ONE.into()]),
+            H::hash_or_noop(&[F::TWO.into(), F::ONE.into()]),
+            H::hash_or_noop(&[F::TWO.into(), F::TWO.into()]),
+            H::hash_or_noop(&[F::ZERO.into(), F::ZERO.into()]),
         ];
         assert_eq!(mat_1_leaf_hashes, fmt.digests[0..4]);
 
@@ -267,10 +274,10 @@ mod tests {
             .zip(mat_2.iter())
             .map(|(row1, row2)| {
                 let mut new_row = row1.clone();
-                new_row.extend_from_slice(row2);
+                new_row.extend_from_slice(&row2.clone().into_generic_field_vec());
                 new_row
             })
-            .collect::<Vec<Vec<F>>>();
+            .collect::<Vec<Vec<GenericField<F>>>>();
         let layer_1 = [
             H::hash_or_noop(&new_leaves[0]),
             H::hash_or_noop(&new_leaves[1]),

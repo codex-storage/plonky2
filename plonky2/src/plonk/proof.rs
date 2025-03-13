@@ -25,7 +25,7 @@ use crate::hash::merkle_tree::MerkleCap;
 use crate::iop::ext_target::ExtensionTarget;
 use crate::iop::target::Target;
 use crate::plonk::circuit_data::{CommonCircuitData, VerifierOnlyCircuitData};
-use crate::plonk::config::{GenericConfig, Hasher};
+use crate::plonk::config::{GenericConfig, GenericField, Hasher, IntoGenericFieldVec};
 use crate::plonk::verifier::{verify_with_challenges, DEFAULT_VERIFIER_OPTIONS};
 use crate::util::serialization::{Buffer, Read, Write};
 
@@ -104,7 +104,8 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
     pub fn get_public_inputs_hash(
         &self,
     ) -> <<C as GenericConfig<D>>::InnerHasher as Hasher<F>>::Hash {
-        C::InnerHasher::hash_no_pad(&self.public_inputs)
+        let pi_felts: Vec<GenericField<F>> = self.public_inputs.clone().into_generic_field_vec();
+        C::InnerHasher::hash_no_pad(&pi_felts)
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -234,7 +235,8 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
     pub(crate) fn get_public_inputs_hash(
         &self,
     ) -> <<C as GenericConfig<D>>::InnerHasher as Hasher<F>>::Hash {
-        C::InnerHasher::hash_no_pad(&self.public_inputs)
+        let pi_felts: Vec<GenericField<F>> = self.public_inputs.clone().into_generic_field_vec();
+        C::InnerHasher::hash_no_pad(&pi_felts)
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {

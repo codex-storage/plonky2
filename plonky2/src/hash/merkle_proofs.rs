@@ -13,7 +13,7 @@ use crate::hash::merkle_tree::MerkleCap;
 use crate::iop::target::{BoolTarget, Target};
 use crate::plonk::circuit_builder::CircuitBuilder;
 use crate::plonk::circuit_data::VerifierCircuitTarget;
-use crate::plonk::config::{AlgebraicHasher, GenericHashOut, Hasher};
+use crate::plonk::config::{AlgebraicHasher, GenericField, GenericHashOut, Hasher, IntoGenericFieldVec};
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 #[serde(bound = "")]
@@ -77,7 +77,12 @@ pub fn verify_batch_merkle_proof_to_cap<F: RichField, H: Hasher<F>>(
     proof: &MerkleProof<F, H>,
 ) -> Result<()> {
     assert_eq!(leaf_data.len(), leaf_heights.len());
-    let mut current_digest = H::hash_or_noop(&leaf_data[0]);
+    let leaf_data_felts: Vec<Vec<GenericField<F>>> = leaf_data.into_iter()
+        .map(|inner| {
+            inner.clone().into_generic_field_vec()
+        })
+        .collect();
+    let mut current_digest = H::hash_or_noop(&leaf_data_felts[0]);
     let mut current_height = leaf_heights[0];
     let mut leaf_data_index = 1;
     for &sibling_digest in &proof.siblings {
@@ -92,12 +97,12 @@ pub fn verify_batch_merkle_proof_to_cap<F: RichField, H: Hasher<F>>(
 
         if leaf_data_index < leaf_heights.len() && current_height == leaf_heights[leaf_data_index] {
             let mut new_leaves = current_digest.to_vec();
-            new_leaves.extend_from_slice(&leaf_data[leaf_data_index]);
+            new_leaves.extend_from_slice(&leaf_data_felts[leaf_data_index]);
             current_digest = H::hash_or_noop(&new_leaves);
             leaf_data_index += 1;
         }
     }
-    assert_eq!(leaf_data_index, leaf_data.len());
+    assert_eq!(leaf_data_index, leaf_data_felts.len());
     ensure!(
         current_digest == merkle_cap.0[leaf_index],
         "Invalid Merkle proof."

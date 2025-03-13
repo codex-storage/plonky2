@@ -8,7 +8,7 @@
 
 #[cfg(not(feature = "std"))]
 use alloc::{vec, vec::Vec};
-use core::fmt::Debug;
+use core::fmt::{Debug};
 
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -22,18 +22,114 @@ use crate::hash::keccak::KeccakHash;
 use crate::hash::poseidon::PoseidonHash;
 use crate::iop::target::{BoolTarget, Target};
 use crate::plonk::circuit_builder::CircuitBuilder;
+use ark_bn254::Fr as BN254Fr;
+use ark_ff::{One, Zero};
+use crate::hash::poseidon2_bn254::{bytes_le_to_felts, felts_to_bytes_le, Poseidon2BN254};
 
 pub trait GenericHashOut<F: RichField>:
-    Copy + Clone + Debug + Eq + PartialEq + Send + Sync + Serialize + DeserializeOwned
+Copy + Clone + Debug + Eq + PartialEq + Send + Sync + Serialize + DeserializeOwned
 {
     fn to_bytes(&self) -> Vec<u8>;
     fn from_bytes(bytes: &[u8]) -> Self;
 
-    fn to_vec(&self) -> Vec<F>;
+    fn to_vec(&self) -> Vec<GenericField<F>>;
+}
+
+/// generic field enum - supports only 2 fields for now
+/// Supported fields: Goldilocks , BN254 Fr (from Arkworks)
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum GenericField<F: RichField> {
+    Goldilocks(F),
+    BN254(BN254Fr),
+}
+
+// Convert a Goldilocks field element into a GenericField.
+impl<F: RichField> From<F> for GenericField<F> {
+    fn from(x: F) -> Self {
+        GenericField::Goldilocks(x)
+    }
+}
+
+// Convert a BN254Fr element into a GenericField.
+impl<F: RichField> From<BN254Fr> for GenericField<F> {
+    fn from(x: BN254Fr) -> Self {
+        GenericField::BN254(x)
+    }
+}
+
+/// Extension trait to convert vectors of F or BN254Fr to Vec<GenericField<F>>.
+pub trait IntoGenericFieldVec<F: RichField> {
+    fn into_generic_field_vec(self) -> Vec<GenericField<F>>;
+}
+
+impl<F: RichField> IntoGenericFieldVec<F> for Vec<F> {
+    fn into_generic_field_vec(self) -> Vec<GenericField<F>> {
+        self.into_iter().map(GenericField::from).collect()
+    }
+}
+
+impl<F: RichField> IntoGenericFieldVec<F> for Vec<BN254Fr> {
+    fn into_generic_field_vec(self) -> Vec<GenericField<F>> {
+        self.into_iter().map(GenericField::from).collect()
+    }
+}
+
+/// hasher field trait to cover fields in `GenericField` enum
+pub trait HasherField: Default + Sized + Copy + Debug + Eq + PartialEq + Sync + Send {
+    fn get_one() -> Self;
+    fn get_zero() -> Self;
+    fn to_bytes_le(&self) -> Vec<u8>;
+
+    fn from_bytes_le(b: &[u8]) -> Self;
+
+}
+
+/// BN254 as Hasherfield
+impl HasherField for BN254Fr {
+    fn get_one() -> Self {
+        BN254Fr::one()
+    }
+
+    fn get_zero() -> Self {
+        BN254Fr::zero()
+    }
+
+    fn to_bytes_le(&self) -> Vec<u8> {
+        felts_to_bytes_le::<BN254Fr>(&self)
+    }
+
+    fn from_bytes_le(b: &[u8]) -> Self {
+        bytes_le_to_felts::<BN254Fr>(b)
+    }
+}
+
+/// RichField (Goldilocks) as Hasherfield
+impl <T: RichField> HasherField for T {
+    fn get_one() -> Self {
+        T::ONE
+    }
+
+    fn get_zero() -> Self {
+        T::ZERO
+    }
+
+    fn to_bytes_le(&self) -> Vec<u8> {
+        self.to_canonical_u64().to_le_bytes().to_vec()
+    }
+
+    fn from_bytes_le(b: &[u8]) -> Self {
+        assert_eq!(b.len(), 8, "Input vector must have exactly 8 bytes");
+        let arr: [u8; 8] = b.try_into().expect("Conversion to array failed");
+        let element = u64::from_le_bytes(arr);
+        T::from_canonical_u64(element)
+    }
 }
 
 /// Trait for hash functions.
 pub trait Hasher<F: RichField>: Sized + Copy + Debug + Eq + PartialEq {
+
+    type HF: HasherField;
+
     /// Size of `Hash` in bytes.
     const HASH_SIZE: usize;
 
@@ -41,39 +137,27 @@ pub trait Hasher<F: RichField>: Sized + Copy + Debug + Eq + PartialEq {
     type Hash: GenericHashOut<F>;
 
     /// Permutation used in the sponge construction.
-    type Permutation: PlonkyPermutation<F>;
+    type Permutation: PlonkyPermutation<Self::HF>;
 
     /// Hash a message without any padding step. Note that this can enable length-extension attacks.
     /// However, it is still collision-resistant in cases where the input has a fixed length.
-    fn hash_no_pad(input: &[F]) -> Self::Hash;
+    fn hash_no_pad(input: &[GenericField<F>]) -> Self::Hash;
 
     /// Pad the message using the `pad10*1` rule, then hash it.
-    fn hash_pad(input: &[F]) -> Self::Hash {
-        let mut padded_input = input.to_vec();
-        padded_input.push(F::ONE);
-        while (padded_input.len() + 1) % Self::Permutation::RATE != 0 {
-            padded_input.push(F::ZERO);
-        }
-        padded_input.push(F::ONE);
-        Self::hash_no_pad(&padded_input)
-    }
+    fn hash_pad(input: &[GenericField<F>]) -> Self::Hash;
 
     /// Hash the slice if necessary to reduce its length to ~256 bits. If it already fits, this is a
     /// no-op.
-    fn hash_or_noop(inputs: &[F]) -> Self::Hash {
-        if inputs.len() * 8 <= Self::HASH_SIZE {
-            let mut inputs_bytes = vec![0u8; Self::HASH_SIZE];
-            for i in 0..inputs.len() {
-                inputs_bytes[i * 8..(i + 1) * 8]
-                    .copy_from_slice(&inputs[i].to_canonical_u64().to_le_bytes());
-            }
-            Self::Hash::from_bytes(&inputs_bytes)
-        } else {
-            Self::hash_no_pad(inputs)
-        }
-    }
+    fn hash_or_noop(inputs: &[GenericField<F>]) -> Self::Hash;
 
+    /// absorb the input into the given state
+    fn sponge(state: &mut Self::Permutation, input: Vec<GenericField<F>>);
+
+    /// 2-to-1 compression
     fn two_to_one(left: Self::Hash, right: Self::Hash) -> Self::Hash;
+
+    /// squeeze out a vec of Goldilocks field elements (used for duplex/challenger)
+    fn squeeze_goldilocks(state: &mut Self::Permutation) -> Vec<F>;
 }
 
 /// Trait for algebraic hash functions, built from a permutation using the sponge construction.
@@ -87,16 +171,17 @@ pub trait AlgebraicHasher<F: RichField>: Hasher<F, Hash = HashOut<F>> {
         swap: BoolTarget,
         builder: &mut CircuitBuilder<F, D>,
     ) -> Self::AlgebraicPermutation
-    where
-        F: RichField + Extendable<D>;
+        where
+            F: RichField + Extendable<D>;
 }
 
 /// Generic configuration trait.
 pub trait GenericConfig<const D: usize>:
-    Debug + Clone + Sync + Sized + Send + Eq + PartialEq
+Debug + Clone + Sync + Sized + Send + Eq + PartialEq
 {
     /// Main field.
     type F: RichField + Extendable<D, Extension = Self::FE>;
+
     /// Field extension of degree D of the main field.
     type FE: FieldExtension<D, BaseField = Self::F>;
     /// Hash function used for building Merkle trees.
@@ -122,5 +207,15 @@ impl GenericConfig<2> for KeccakGoldilocksConfig {
     type F = GoldilocksField;
     type FE = QuadraticExtension<Self::F>;
     type Hasher = KeccakHash<25>;
+    type InnerHasher = PoseidonHash;
+}
+
+/// Configuration using Poseidon2BN254 as hasher over the Goldilocks field.
+#[derive(Debug, Copy, Clone, Default, Eq, PartialEq, Serialize)]
+pub struct Poseidon2BN254Config;
+impl GenericConfig<2> for Poseidon2BN254Config {
+    type F = GoldilocksField;
+    type FE = QuadraticExtension<Self::F>;
+    type Hasher = Poseidon2BN254;
     type InnerHasher = PoseidonHash;
 }
