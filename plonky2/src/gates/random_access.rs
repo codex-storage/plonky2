@@ -526,6 +526,7 @@ mod tests {
                 &constants,
             ),
             public_inputs_hash: &HashOut::rand(),
+            public_inputs: &[F::rand()],
         };
         let bad_claimed_elements = F::rand_vec(4);
         let bad_vars = EvaluationVars {
@@ -538,6 +539,7 @@ mod tests {
                 &constants,
             ),
             public_inputs_hash: &HashOut::rand(),
+            public_inputs: &[F::rand()],
         };
 
         assert!(

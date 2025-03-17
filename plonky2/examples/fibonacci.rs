@@ -44,6 +44,7 @@ fn main() -> Result<()> {
     let prover_opts = ProverOptions {
         export_witness: Some(String::from("fibonacci_witness.json")),
         print_hash_statistics: HashStatisticsPrintLevel::Info,
+        hash_public_input: true,
     };
   
     let proof = data.prove_with_options(pw, &prover_opts)?;
@@ -55,6 +56,7 @@ fn main() -> Result<()> {
 
     let verifier_opts = VerifierOptions {
         print_hash_statistics: HashStatisticsPrintLevel::Summary,
+        hash_public_input: true,
     };
     data.verify_with_options(proof, &verifier_opts)
 

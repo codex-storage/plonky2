@@ -36,6 +36,8 @@ pub fn test_gate_constraints<F: RichField + Extendable<D>, const D: usize>() {
         [ make_fext::<F,D>(666)
         , make_fext::<F,D>(77) 
         ];
+
+  let pi = F::rand_vec(4);
   let input_hash = HashOut{ elements: 
         [ F::from_canonical_u64(101) 
         , F::from_canonical_u64(102)
@@ -47,7 +49,8 @@ pub fn test_gate_constraints<F: RichField + Extendable<D>, const D: usize>() {
   let vars = EvaluationVars
         { local_constants:    &loc_constants
         , local_wires:        &loc_wires    
-        , public_inputs_hash: &input_hash   
+        , public_inputs_hash: &input_hash
+        , public_inputs: &pi
         };
 
   let circuit_config: CircuitConfig = CircuitConfig::standard_recursion_config();

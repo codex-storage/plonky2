@@ -22,7 +22,7 @@ use crate::fri::oracle::PolynomialBatch;
 use crate::gates::lookup::LookupGate;
 use crate::gates::lookup_table::LookupTableGate;
 use crate::gates::selectors::{LookupSelectors};
-use crate::hash::hash_types::RichField;
+use crate::hash::hash_types::{HashOut, RichField};
 use crate::hash::hashing::*;
 use crate::iop::challenger::Challenger;
 use crate::iop::generator::generate_partial_witness;
@@ -123,11 +123,19 @@ pub fn set_lookup_wires<
 pub struct ProverOptions {
     pub export_witness: Option<String>,      // export the full witness into the given file
     pub print_hash_statistics: HashStatisticsPrintLevel,
+    pub hash_public_input: bool,
 }
 
 pub const DEFAULT_PROVER_OPTIONS: ProverOptions = ProverOptions {
     export_witness:        None,  
     print_hash_statistics: HashStatisticsPrintLevel::None,
+    hash_public_input: true,
+};
+
+pub const UNHASHED_PI_PROVER_OPTIONS: ProverOptions = ProverOptions {
+    export_witness:        None,
+    print_hash_statistics: HashStatisticsPrintLevel::None,
+    hash_public_input: false,
 };
 
 // things we want to export to be used by third party tooling
@@ -201,6 +209,21 @@ fn collect_things_to_export<F: RichField + Extendable<D>, C: GenericConfig<D, F 
 
 //------------------------------------------------------------------------------
 
+pub fn prove_unhashed_pi<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    prover_data: &ProverOnlyCircuitData<F, C, D>,
+    common_data: &CommonCircuitData<F, D>,
+    inputs: PartialWitness<F>,
+    timing: &mut TimingTree,
+) -> Result<ProofWithPublicInputs<F, C, D>> {
+    prove_with_options(
+        prover_data,
+        common_data,
+        inputs,
+        timing,
+        &UNHASHED_PI_PROVER_OPTIONS,
+    )
+}
+
 pub fn prove<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
     prover_data: &ProverOnlyCircuitData<F, C, D>,
     common_data: &CommonCircuitData<F, D>,
@@ -269,8 +292,13 @@ where
     set_lookup_wires(prover_data, common_data, &mut partition_witness)?;
 
     let public_inputs = partition_witness.get_targets(&prover_data.public_inputs);
-    let pi_felts: Vec<GenericField<F>> = public_inputs.clone().into_generic_field_vec();
-    let public_inputs_hash = C::InnerHasher::hash_no_pad(&pi_felts);
+    let public_inputs_hash: <<C as GenericConfig<D>>::InnerHasher as Hasher<F>>::Hash =
+    if prover_options.hash_public_input {
+        let pi_felts: Vec<GenericField<F>> = public_inputs.clone().into_generic_field_vec();
+        C::InnerHasher::hash_no_pad(&pi_felts)
+    }else{
+        HashOut::<F>::default()
+    };
 
     let witness = timed!(
         timing,
@@ -320,7 +348,12 @@ where
 
     // Observe the instance.
     challenger.observe_hash::<C::Hasher>(prover_data.circuit_digest);
-    challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    if prover_options.hash_public_input {
+        challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    } else{
+        let pi_felts = public_inputs.clone().into_generic_field_vec();
+        challenger.observe_elements(&pi_felts);
+    }
 
     challenger.observe_cap::<C::Hasher>(&wires_commitment.merkle_tree.cap);
 
@@ -397,6 +430,7 @@ where
         compute_quotient_polys::<F, C, D>(
             common_data,
             prover_data,
+            &public_inputs,
             &public_inputs_hash,
             &wires_commitment,
             &partial_products_zs_and_lookup_commitment,
@@ -757,6 +791,7 @@ fn compute_quotient_polys<
 >(
     common_data: &CommonCircuitData<F, D>,
     prover_data: &'a ProverOnlyCircuitData<F, C, D>,
+    public_inputs: &[F],
     public_inputs_hash: &<<C as GenericConfig<D>>::InnerHasher as Hasher<F>>::Hash,
     wires_commitment: &'a PolynomialBatch<F, C, D>,
     zs_partial_products_and_lookup_commitment: &'a PolynomialBatch<F, C, D>,
@@ -913,12 +948,14 @@ fn compute_quotient_polys<
                 }
             }
 
-            let vars_batch = EvaluationVarsBaseBatch::new(
-                xs_batch.len(),
-                &local_constants_batch,
-                &local_wires_batch,
-                public_inputs_hash,
-            );
+            let vars_batch =
+                EvaluationVarsBaseBatch::new(
+                    xs_batch.len(),
+                    &local_constants_batch,
+                    &local_wires_batch,
+                    &public_inputs_hash,
+                    public_inputs,
+                );
 
             let mut quotient_values_batch = eval_vanishing_poly_base_batch::<F, D>(
                 common_data,

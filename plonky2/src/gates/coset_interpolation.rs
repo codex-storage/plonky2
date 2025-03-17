@@ -864,6 +864,7 @@ mod tests {
             local_constants: &[],
             local_wires: &get_wires(shift, values, eval_point),
             public_inputs_hash: &HashOut::rand(),
+            public_inputs: &[F::rand()],
         };
 
         assert!(

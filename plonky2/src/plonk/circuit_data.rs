@@ -46,8 +46,8 @@ use crate::plonk::circuit_builder::CircuitBuilder;
 use crate::plonk::config::{GenericConfig, Hasher};
 use crate::plonk::plonk_common::PlonkOracle;
 use crate::plonk::proof::{CompressedProofWithPublicInputs, ProofWithPublicInputs};
-use crate::plonk::prover::{prove, prove_with_options, ProverOptions};
-use crate::plonk::verifier::{verify, verify_with_options, VerifierOptions};
+use crate::plonk::prover::{prove, prove_unhashed_pi, prove_with_options, ProverOptions};
+use crate::plonk::verifier::{verify, verify_with_options, VerifierOptions, verify_unhashed_pi};
 use crate::util::serialization::{
     Buffer, GateSerializer, IoResult, Read, WitnessGeneratorSerializer, Write,
 };
@@ -199,6 +199,15 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
         )
     }
 
+    pub fn prove_unhashed_pi(&self, inputs: PartialWitness<F>) -> Result<ProofWithPublicInputs<F, C, D>> {
+        prove_unhashed_pi::<F, C, D>(
+            &self.prover_only,
+            &self.common,
+            inputs,
+            &mut TimingTree::default(),
+        )
+    }
+
     pub fn prove_with_options(&self, inputs: PartialWitness<F>, opts: &ProverOptions) -> Result<ProofWithPublicInputs<F, C, D>> {
         prove_with_options::<F, C, D>(
             &self.prover_only,
@@ -211,6 +220,10 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
 
     pub fn verify(&self, proof_with_pis: ProofWithPublicInputs<F, C, D>) -> Result<()> {
         verify::<F, C, D>(proof_with_pis, &self.verifier_only, &self.common)
+    }
+
+    pub fn verify_unhashed_pi(&self, proof_with_pis: ProofWithPublicInputs<F, C, D>) -> Result<()> {
+        verify_unhashed_pi::<F, C, D>(proof_with_pis, &self.verifier_only, &self.common)
     }
 
     pub fn verify_with_options(&self, proof_with_pis: ProofWithPublicInputs<F, C, D>, verifier_options: &VerifierOptions) -> Result<()> {
@@ -302,6 +315,15 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
         buffer.read_prover_circuit_data(gate_serializer, generator_serializer)
     }
 
+    pub fn prove_unhashed_pi(&self, inputs: PartialWitness<F>) -> Result<ProofWithPublicInputs<F, C, D>> {
+        prove_unhashed_pi::<F, C, D>(
+            &self.prover_only,
+            &self.common,
+            inputs,
+            &mut TimingTree::default(),
+        )
+    }
+
     pub fn prove(&self, inputs: PartialWitness<F>) -> Result<ProofWithPublicInputs<F, C, D>> {
         prove::<F, C, D>(
             &self.prover_only,
@@ -352,6 +374,10 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
 
     pub fn verify(&self, proof_with_pis: ProofWithPublicInputs<F, C, D>) -> Result<()> {
         verify::<F, C, D>(proof_with_pis, &self.verifier_only, &self.common)
+    }
+
+    pub fn verify_unhashed_pi(&self, proof_with_pis: ProofWithPublicInputs<F, C, D>) -> Result<()> {
+        verify_unhashed_pi::<F, C, D>(proof_with_pis, &self.verifier_only, &self.common)
     }
 
     pub fn verify_compressed(

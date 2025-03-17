@@ -15,6 +15,7 @@ pub struct EvaluationVars<'a, F: RichField + Extendable<D>, const D: usize> {
     pub local_constants: &'a [F::Extension],
     pub local_wires: &'a [F::Extension],
     pub public_inputs_hash: &'a HashOut<F>,
+    pub public_inputs: &'a [F],
 }
 
 /// A batch of evaluation vars, in the base field.
@@ -26,6 +27,7 @@ pub struct EvaluationVarsBaseBatch<'a, F: Field> {
     pub local_constants: &'a [F],
     pub local_wires: &'a [F],
     pub public_inputs_hash: &'a HashOut<F>,
+    pub public_inputs: &'a [F],
 }
 
 /// A view into `EvaluationVarsBaseBatch` for a particular evaluation point. Does not copy the data.
@@ -34,6 +36,7 @@ pub struct EvaluationVarsBase<'a, F: Field> {
     pub local_constants: PackedStridedView<'a, F>,
     pub local_wires: PackedStridedView<'a, F>,
     pub public_inputs_hash: &'a HashOut<F>,
+    pub public_inputs: &'a [F],
 }
 
 /// Like `EvaluationVarsBase`, but packed.
@@ -44,6 +47,7 @@ pub struct EvaluationVarsBasePacked<'a, P: PackedField> {
     pub local_constants: PackedStridedView<'a, P>,
     pub local_wires: PackedStridedView<'a, P>,
     pub public_inputs_hash: &'a HashOut<P::Scalar>,
+    pub public_inputs: &'a [P::Scalar],
 }
 
 impl<F: RichField + Extendable<D>, const D: usize> EvaluationVars<'_, F, D> {
@@ -67,6 +71,7 @@ impl<'a, F: Field> EvaluationVarsBaseBatch<'a, F> {
         local_constants: &'a [F],
         local_wires: &'a [F],
         public_inputs_hash: &'a HashOut<F>,
+        public_inputs: &'a [F],
     ) -> Self {
         assert_eq!(local_constants.len() % batch_size, 0);
         assert_eq!(local_wires.len() % batch_size, 0);
@@ -75,6 +80,7 @@ impl<'a, F: Field> EvaluationVarsBaseBatch<'a, F> {
             local_constants,
             local_wires,
             public_inputs_hash,
+            public_inputs
         }
     }
 
@@ -99,6 +105,7 @@ impl<'a, F: Field> EvaluationVarsBaseBatch<'a, F> {
             local_constants,
             local_wires,
             public_inputs_hash: self.public_inputs_hash,
+            public_inputs: self.public_inputs,
         }
     }
 
@@ -196,6 +203,7 @@ impl<'a, P: PackedField> Iterator for EvaluationVarsBaseBatchIterPacked<'a, P> {
                 local_constants,
                 local_wires,
                 public_inputs_hash: self.vars_batch.public_inputs_hash,
+                public_inputs: self.vars_batch.public_inputs,
             };
             self.i += P::WIDTH;
             Some(res)

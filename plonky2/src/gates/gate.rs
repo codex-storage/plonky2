@@ -99,10 +99,12 @@ pub trait Gate<F: RichField + Extendable<D>, const D: usize>: 'static + Send + S
             .map(|w| F::Extension::from_basefield(*w))
             .collect::<Vec<_>>();
         let public_inputs_hash = &vars_base.public_inputs_hash;
+        let public_inputs = &vars_base.public_inputs;
         let vars = EvaluationVars {
             local_constants,
             local_wires,
             public_inputs_hash,
+            public_inputs,
         };
         let values = self.eval_unfiltered(vars);
 

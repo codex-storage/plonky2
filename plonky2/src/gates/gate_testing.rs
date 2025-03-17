@@ -28,6 +28,7 @@ pub fn test_low_degree<F: RichField + Extendable<D>, G: Gate<F, D>, const D: usi
     let constant_ldes = random_low_degree_matrix::<F::Extension>(gate.num_constants(), rate_bits);
     assert_eq!(wire_ldes.len(), constant_ldes.len());
     let public_inputs_hash = &HashOut::rand();
+    let pi_rand = F::rand_vec(4);
 
     let constraint_evals = wire_ldes
         .iter()
@@ -36,6 +37,7 @@ pub fn test_low_degree<F: RichField + Extendable<D>, G: Gate<F, D>, const D: usi
             local_constants,
             local_wires,
             public_inputs_hash,
+            public_inputs: &pi_rand,
         })
         .map(|vars| gate.eval_unfiltered(vars))
         .collect::<Vec<_>>();
@@ -107,13 +109,16 @@ pub fn test_eval_fns<
         .collect::<Vec<_>>();
     let public_inputs_hash = HashOut::rand();
 
+    let rand_pi = F::rand_vec(4);
+
     // Batch of 1.
     let vars_base_batch =
-        EvaluationVarsBaseBatch::new(1, &constants_base, &wires_base, &public_inputs_hash);
+        EvaluationVarsBaseBatch::new(1, &constants_base, &wires_base, &public_inputs_hash, &rand_pi);
     let vars = EvaluationVars {
         local_constants: &constants,
         local_wires: &wires,
         public_inputs_hash: &public_inputs_hash,
+        public_inputs: &rand_pi
     };
 
     let evals_base = gate.eval_unfiltered_base_batch(vars_base_batch);
@@ -146,6 +151,7 @@ pub fn test_eval_fns<
         local_constants: &constants,
         local_wires: &wires,
         public_inputs_hash: &public_inputs_hash,
+        public_inputs: &rand_pi,
     };
     let evals = gate.eval_unfiltered(vars);
 
