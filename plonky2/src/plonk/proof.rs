@@ -93,7 +93,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
         circuit_digest: &<<C as GenericConfig<D>>::Hasher as Hasher<C::F>>::Hash,
         common_data: &CommonCircuitData<F, D>,
     ) -> anyhow::Result<CompressedProofWithPublicInputs<F, C, D>> {
-        let indices = self.fri_query_indices(circuit_digest, common_data)?;
+        let indices = self.fri_query_indices(circuit_digest, common_data, true)?;
         let compressed_proof = self.proof.compress(&indices, &common_data.fri_params);
         Ok(CompressedProofWithPublicInputs {
             public_inputs: self.public_inputs,
@@ -224,6 +224,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
                 .decompress(&challenges, fri_inferred_elements, &common_data.fri_params);
         verify_with_challenges::<F, C, D>(
             decompressed_proof,
+            self.public_inputs,
             public_inputs_hash,
             challenges,
             verifier_data,

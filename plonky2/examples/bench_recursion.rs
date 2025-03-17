@@ -247,6 +247,7 @@ where
     let prover_opts = ProverOptions {
         export_witness: Some(format!("{}_witness.json",name)),
         print_hash_statistics: HashStatisticsPrintLevel::Summary,  // ::None,
+        hash_public_input: true,
     };
 
     let mut timing = TimingTree::new("prove", Level::Debug);
@@ -265,6 +266,7 @@ where
 
     let verifier_opts = VerifierOptions {
         print_hash_statistics: HashStatisticsPrintLevel::Summary,
+        hash_public_input: true,
     };
     data.verify_with_options(proof.clone(), &verifier_opts)?;
 

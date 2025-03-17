@@ -30,6 +30,7 @@ use crate::gates::lookup::{Lookup, LookupGate};
 use crate::gates::lookup_table::LookupTable;
 use crate::gates::noop::NoopGate;
 use crate::gates::public_input::PublicInputGate;
+use crate::gates::public_input_v2::PublicInputGateV2;
 use crate::gates::selectors::{selector_ends_lookups, selector_polynomials, selectors_lookup};
 use crate::hash::hash_types::{HashOut, HashOutTarget, MerkleCapTarget, RichField};
 use crate::hash::merkle_proofs::MerkleProofTarget;
@@ -1061,8 +1062,9 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
     pub fn build_with_options<C: GenericConfig<D, F = F>>(
         self,
         commit_to_sigma: bool,
+        hash_public_input: bool,
     ) -> CircuitData<F, C, D> {
-        let (circuit_data, success) = self.try_build_with_options(commit_to_sigma);
+        let (circuit_data, success) = self.try_build_with_options(commit_to_sigma, hash_public_input);
         if !success {
             panic!("Failed to build circuit");
         }
@@ -1072,6 +1074,7 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
     pub fn try_build_with_options<C: GenericConfig<D, F = F>>(
         mut self,
         commit_to_sigma: bool,
+        hash_public_input: bool,
     ) -> (CircuitData<F, C, D>, bool) {
         let mut timing = TimingTree::new("preprocess", Level::Trace);
 
@@ -1085,21 +1088,52 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
         // Hash the public inputs, and route them to a `PublicInputGate` which will enforce that
         // those hash wires match the claimed public inputs.
         let num_public_inputs = self.public_inputs.len();
-        let public_inputs_hash =
-            self.hash_n_to_hash_no_pad::<C::InnerHasher>(self.public_inputs.clone());
-        let pi_gate = self.add_gate(PublicInputGate, vec![]);
-        for (&hash_part, wire) in public_inputs_hash
-            .elements
-            .iter()
-            .zip(PublicInputGate::wires_public_inputs_hash())
-        {
-            self.connect(hash_part, Target::wire(pi_gate, wire))
-        }
 
-        // See <https://github.com/0xPolygonZero/plonky2/issues/456>
-        // however randomization makes debugging harder as runs are not deterministic
-        if self.config.randomize_unused_wires {
-            self.randomize_unused_pi_wires(pi_gate);
+        // only hash public input if flag is set
+        if hash_public_input {
+            let public_inputs_hash =
+                self.hash_n_to_hash_no_pad::<C::InnerHasher>(self.public_inputs.clone());
+            let pi_gate = self.add_gate(PublicInputGate, vec![]);
+            for (&hash_part, wire) in public_inputs_hash
+                .elements
+                .iter()
+                .zip(PublicInputGate::wires_public_inputs_hash())
+            {
+                self.connect(hash_part, Target::wire(pi_gate, wire))
+            }
+
+            // See <https://github.com/0xPolygonZero/plonky2/issues/456>
+            // however randomization makes debugging harder as runs are not deterministic
+            if self.config.randomize_unused_wires {
+                self.randomize_unused_pi_wires(pi_gate);
+            }
+        } else {
+            let num_of_routed_wires = self.config.num_routed_wires;
+            let num_of_pi_gates = num_public_inputs.div_ceil(num_of_routed_wires);
+            let mut pi_gates = vec![];
+            let all_pi = self.public_inputs.clone();
+            for i in 0..num_of_pi_gates{
+                // start index
+                let start_i = i*num_of_routed_wires;
+                // make sure we do not go past the number of public inputs.
+                let end_i = core::cmp::min(start_i + num_of_routed_wires, num_public_inputs);
+                // the number of public inputs in this gate.
+                let num_pi_in_gate = end_i - start_i;
+
+                let pi_gate = self.add_gate(
+                    PublicInputGateV2::new(num_pi_in_gate, start_i)
+                    , vec![]);
+
+                // connect
+                let wire_range = 0..num_pi_in_gate;
+                for (&pi_part, wire) in all_pi[start_i .. end_i]
+                    .iter()
+                    .zip(wire_range)
+                {
+                    self.connect(pi_part, Target::wire(pi_gate, wire))
+                }
+                pi_gates.push(pi_gate);
+            }
         }
 
         // Place LUT-related gates.
@@ -1329,11 +1363,17 @@ impl<F: RichField + Extendable<D>, const D: usize> CircuitBuilder<F, D> {
 
     /// Builds a "full circuit", with both prover and verifier data.
     pub fn build<C: GenericConfig<D, F = F>>(self) -> CircuitData<F, C, D> {
-        self.build_with_options(true)
+        self.build_with_options(true, true)
+    }
+
+    /// Builds a "full circuit", with both prover and verifier data.
+    /// the public input are not hashed when calling this function
+    pub fn build_unhashed_pi<C: GenericConfig<D, F = F>>(self) -> CircuitData<F, C, D> {
+        self.build_with_options(true, false)
     }
 
     pub fn mock_build<C: GenericConfig<D, F = F>>(self) -> MockCircuitData<F, C, D> {
-        let circuit_data = self.build_with_options(false);
+        let circuit_data = self.build_with_options(false, true);
         MockCircuitData {
             prover_only: circuit_data.prover_only,
             common: circuit_data.common,

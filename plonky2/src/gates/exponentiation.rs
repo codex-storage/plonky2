@@ -430,6 +430,7 @@ mod tests {
             local_constants: &[],
             local_wires: &get_wires(base, power as u64),
             public_inputs_hash: &HashOut::rand(),
+            public_inputs: &[F::rand()],
         };
         assert!(
             gate.eval_unfiltered(vars).iter().all(|x| x.is_zero()),

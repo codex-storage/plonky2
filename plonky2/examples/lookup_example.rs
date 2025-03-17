@@ -145,6 +145,7 @@ fn main() -> Result<()> {
     let prover_opts = ProverOptions {
         export_witness: Some(String::from("lookup_witness.json")),
         print_hash_statistics: HashStatisticsPrintLevel::None,
+        hash_public_input: true,
     };
     let proof = data.prove_with_options(pw, &prover_opts)?;
 

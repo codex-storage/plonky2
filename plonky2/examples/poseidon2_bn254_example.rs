@@ -43,6 +43,7 @@ fn main() -> Result<()> {
 
     let verifier_opts = VerifierOptions {
         print_hash_statistics: HashStatisticsPrintLevel::Summary,
+        hash_public_input: true,
     };
 
     assert!(data.verify_with_options(proof, &verifier_opts).is_ok());

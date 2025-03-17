@@ -38,6 +38,7 @@ pub mod packed_util;
 pub mod poseidon;
 pub mod poseidon_mds;
 pub mod public_input;
+pub mod public_input_v2;
 pub mod random_access;
 pub mod reducing;
 pub mod reducing_extension;

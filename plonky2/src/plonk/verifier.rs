@@ -5,7 +5,7 @@ use anyhow::{ensure, Result};
 use crate::field::extension::Extendable;
 use crate::field::types::Field;
 use crate::fri::verifier::verify_fri_proof;
-use crate::hash::hash_types::RichField;
+use crate::hash::hash_types::{HashOut, RichField};
 use crate::hash::hashing::*;
 use crate::plonk::circuit_data::{CommonCircuitData, VerifierOnlyCircuitData};
 use crate::plonk::config::{GenericConfig, Hasher};
@@ -27,10 +27,17 @@ pub enum HashStatisticsPrintLevel {
 #[derive(Debug,Clone)]
 pub struct VerifierOptions {
     pub print_hash_statistics: HashStatisticsPrintLevel,
+    pub hash_public_input: bool,
 }
 
 pub const DEFAULT_VERIFIER_OPTIONS: VerifierOptions = VerifierOptions {
     print_hash_statistics: HashStatisticsPrintLevel::None,
+    hash_public_input: true,
+};
+
+pub const UNHASHED_PI_VERIFIER_OPTIONS: VerifierOptions = VerifierOptions {
+    print_hash_statistics: HashStatisticsPrintLevel::None,
+    hash_public_input: false,
 };
 
 pub(crate) fn verify<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
@@ -45,6 +52,20 @@ pub(crate) fn verify<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, c
         &DEFAULT_VERIFIER_OPTIONS,
     )
 }
+
+pub(crate) fn verify_unhashed_pi<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    proof_with_pis: ProofWithPublicInputs<F, C, D>,
+    verifier_data: &VerifierOnlyCircuitData<C, D>,
+    common_data: &CommonCircuitData<F, D>,
+) -> Result<()> {
+    verify_with_options(
+        proof_with_pis,
+        verifier_data,
+        common_data,
+        &UNHASHED_PI_VERIFIER_OPTIONS,
+    )
+}
+
 pub(crate) fn verify_with_options<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
     proof_with_pis: ProofWithPublicInputs<F, C, D>,
     verifier_data: &VerifierOnlyCircuitData<C, D>,
@@ -56,16 +77,25 @@ pub(crate) fn verify_with_options<F: RichField + Extendable<D>, C: GenericConfig
 
     validate_proof_with_pis_shape(&proof_with_pis, common_data)?;
 
-    let public_inputs_hash = proof_with_pis.get_public_inputs_hash();
+    let public_inputs_hash: HashOut<F> =
+        if verifier_options.hash_public_input {
+            proof_with_pis.get_public_inputs_hash()
+        }else {
+            HashOut::<F>::default()
+        };
 
     if verifier_options.print_hash_statistics >= HashStatisticsPrintLevel::Info {
         print_hash_counters("after PI");
     }
 
+    let pi = if verifier_options.hash_public_input { None } else {Some(proof_with_pis.public_inputs.clone())};
+
     let challenges = proof_with_pis.get_challenges(
+        pi,
         public_inputs_hash,
         &verifier_data.circuit_digest,
         common_data,
+        verifier_options.hash_public_input,
     )?;
 
     if verifier_options.print_hash_statistics >= HashStatisticsPrintLevel::Info {
@@ -74,6 +104,7 @@ pub(crate) fn verify_with_options<F: RichField + Extendable<D>, C: GenericConfig
 
     let result = verify_with_challenges::<F, C, D>(
         proof_with_pis.proof,
+        proof_with_pis.public_inputs,
         public_inputs_hash,
         challenges,
         verifier_data,
@@ -93,6 +124,7 @@ pub(crate) fn verify_with_challenges<
     const D: usize,
 >(
     proof: Proof<F, C, D>,
+    public_inputs: Vec<F>,
     public_inputs_hash: <<C as GenericConfig<D>>::InnerHasher as Hasher<F>>::Hash,
     challenges: ProofChallenges<F, D>,
     verifier_data: &VerifierOnlyCircuitData<C, D>,
@@ -105,6 +137,7 @@ pub(crate) fn verify_with_challenges<
         local_constants,
         local_wires,
         public_inputs_hash: &public_inputs_hash,
+        public_inputs: &public_inputs,
     };
     let local_zs = &proof.openings.plonk_zs;
     let next_zs = &proof.openings.plonk_zs_next;

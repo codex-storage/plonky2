@@ -15,7 +15,7 @@ use crate::iop::challenger::{Challenger, RecursiveChallenger};
 use crate::iop::target::Target;
 use crate::plonk::circuit_builder::CircuitBuilder;
 use crate::plonk::circuit_data::CommonCircuitData;
-use crate::plonk::config::{AlgebraicHasher, GenericConfig, Hasher};
+use crate::plonk::config::{AlgebraicHasher, GenericConfig, Hasher, IntoGenericFieldVec};
 use crate::plonk::proof::{
     CompressedProof, CompressedProofWithPublicInputs, FriInferredElements, OpeningSet,
     OpeningSetTarget, Proof, ProofChallenges, ProofChallengesTarget, ProofTarget,
@@ -24,6 +24,7 @@ use crate::plonk::proof::{
 use crate::util::reverse_bits;
 
 fn get_challenges<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>(
+    public_inputs: Option<Vec<F>>,
     public_inputs_hash: <<C as GenericConfig<D>>::InnerHasher as Hasher<F>>::Hash,
     wires_cap: &MerkleCap<F, C::Hasher>,
     plonk_zs_partial_products_cap: &MerkleCap<F, C::Hasher>,
@@ -34,6 +35,7 @@ fn get_challenges<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, cons
     pow_witness: F,
     circuit_digest: &<<C as GenericConfig<D>>::Hasher as Hasher<C::F>>::Hash,
     common_data: &CommonCircuitData<F, D>,
+    hash_public_input: bool,
 ) -> anyhow::Result<ProofChallenges<F, D>> {
     let config = &common_data.config;
     let num_challenges = config.num_challenges;
@@ -43,7 +45,12 @@ fn get_challenges<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, cons
 
     // Observe the instance.
     challenger.observe_hash::<C::Hasher>(*circuit_digest);
-    challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    if hash_public_input {
+        challenger.observe_hash::<C::InnerHasher>(public_inputs_hash);
+    } else {
+        let pi_felts = public_inputs.unwrap().into_generic_field_vec();
+        challenger.observe_elements(&pi_felts);
+    }
 
     challenger.observe_cap::<C::Hasher>(wires_cap);
     let plonk_betas = challenger.get_n_challenges(num_challenges);
@@ -98,9 +105,11 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
         &self,
         circuit_digest: &<<C as GenericConfig<D>>::Hasher as Hasher<C::F>>::Hash,
         common_data: &CommonCircuitData<F, D>,
+        hash_public_input: bool,
     ) -> anyhow::Result<Vec<usize>> {
+        let pi = if hash_public_input { None } else {Some(self.public_inputs.clone())};
         Ok(self
-            .get_challenges(self.get_public_inputs_hash(), circuit_digest, common_data)?
+            .get_challenges(pi, self.get_public_inputs_hash(), circuit_digest, common_data, hash_public_input)?
             .fri_challenges
             .fri_query_indices)
     }
@@ -108,9 +117,11 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
     /// Computes all Fiat-Shamir challenges used in the Plonk proof.
     pub fn get_challenges(
         &self,
+        public_inputs: Option<Vec<F>>,
         public_inputs_hash: <<C as GenericConfig<D>>::InnerHasher as Hasher<F>>::Hash,
         circuit_digest: &<<C as GenericConfig<D>>::Hasher as Hasher<C::F>>::Hash,
         common_data: &CommonCircuitData<F, D>,
+        hash_public_input: bool,
     ) -> anyhow::Result<ProofChallenges<F, D>> {
         let Proof {
             wires_cap,
@@ -126,19 +137,25 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
                 },
         } = &self.proof;
 
-        get_challenges::<F, C, D>(
-            public_inputs_hash,
-            wires_cap,
-            plonk_zs_partial_products_cap,
-            quotient_polys_cap,
-            openings,
-            commit_phase_merkle_caps,
-            final_poly,
-            *pow_witness,
-            circuit_digest,
-            common_data,
-        )
+        let challenges =
+            get_challenges::<F, C, D>(
+                public_inputs,
+                public_inputs_hash,
+                wires_cap,
+                plonk_zs_partial_products_cap,
+                quotient_polys_cap,
+                openings,
+                commit_phase_merkle_caps,
+                final_poly,
+                *pow_witness,
+                circuit_digest,
+                common_data,
+                hash_public_input
+            );
+
+        challenges
     }
+
 }
 
 impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
@@ -166,6 +183,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
         } = &self.proof;
 
         get_challenges::<F, C, D>(
+            None,
             public_inputs_hash,
             wires_cap,
             plonk_zs_partial_products_cap,
@@ -176,6 +194,7 @@ impl<F: RichField + Extendable<D>, C: GenericConfig<D, F = F>, const D: usize>
             *pow_witness,
             circuit_digest,
             common_data,
+            true,
         )
     }
 
